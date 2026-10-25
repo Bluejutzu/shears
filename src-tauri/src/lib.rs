@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod store;
 
 use std::path::Path;
 
@@ -27,6 +28,17 @@ fn reveal(path: String) {
 }
 
 #[tauri::command]
+fn open_folder(path: String) {
+    let _ = std::fs::create_dir_all(&path);
+    #[cfg(windows)]
+    let _ = std::process::Command::new("explorer").arg(&path).spawn();
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg(&path).spawn();
+    #[cfg(target_os = "linux")]
+    let _ = std::process::Command::new("xdg-open").arg(&path).spawn();
+}
+
+#[tauri::command]
 fn unique_path(path: String) -> String {
     let p = Path::new(&path);
     if !p.exists() {
@@ -50,18 +62,34 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(ffmpeg::Jobs::default())
+        .manage(store::Store::default())
         .invoke_handler(tauri::generate_handler![
             initial_file,
             reveal,
+            open_folder,
             unique_path,
+            store::load_state,
+            store::save_settings,
+            store::save_recents,
+            store::load_edit,
+            store::save_edit,
+            store::forget_edits,
+            store::cache_size,
+            store::clear_cache,
             ffmpeg::tools,
             ffmpeg::probe,
+            ffmpeg::probe_audio,
             ffmpeg::waveform,
+            ffmpeg::extract_audio,
             ffmpeg::thumbnail,
+            ffmpeg::list_media,
+            ffmpeg::media_info,
             ffmpeg::save_frame,
             ffmpeg::make_preview,
             ffmpeg::export,
             ffmpeg::cancel,
+            ffmpeg::read_tags,
+            ffmpeg::write_metadata,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

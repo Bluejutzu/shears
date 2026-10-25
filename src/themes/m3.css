@@ -1,0 +1,1214 @@
+/* Material 3 (Expressive), following the M3 style docs (m3.material.io/styles) for motion, shape,
+   elevation, state layers and type, with the overall feel modeled on Riff
+   (https://github.com/rootscripts/riff, MIT). Colors come from m3.ts. */
+
+@property --sl {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+:root {
+  /* motion: M3 spring tokens converted to web curves (styles/motion/overview/specs).
+     spatial = position, size, shape (overshoots a little); effects = color, opacity (no overshoot) */
+  --md-spatial-fast: 350ms cubic-bezier(0.42, 1.67, 0.21, 0.9);
+  --md-spatial: 500ms cubic-bezier(0.38, 1.21, 0.22, 1);
+  --md-spatial-slow: 650ms cubic-bezier(0.39, 1.29, 0.35, 0.98);
+  --md-effects-fast: 150ms cubic-bezier(0.31, 0.94, 0.34, 1);
+  --md-effects: 200ms cubic-bezier(0.34, 0.8, 0.34, 1);
+  --md-effects-slow: 300ms cubic-bezier(0.34, 0.88, 0.34, 1);
+  --md-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* corners can't overshoot (they'd flash square), so shape morphs ease in without the spring */
+  --md-shape-morph: 250ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* shape: the M3 corner radius scale */
+  --md-shape-xs: 4px;
+  --md-shape-s: 8px;
+  --md-shape-m: 12px;
+  --md-shape-l: 16px;
+  --md-shape-li: 20px;
+  --md-shape-xl: 28px;
+  --md-shape-xli: 32px;
+  --md-shape-xxl: 48px;
+  --md-shape-full: 9999px; /* morphing pills use their exact half height so the change starts right away */
+
+  /* elevation: levels 1-5. surfaces separate by tone first, shadows are for things that float */
+  --md-elev-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-elev-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --md-elev-4: 0 2px 3px rgba(0, 0, 0, 0.3), 0 6px 10px 4px rgba(0, 0, 0, 0.15);
+  --md-elev-5: 0 4px 4px rgba(0, 0, 0, 0.3), 0 8px 12px 6px rgba(0, 0, 0, 0.15);
+  --md-scrim: rgba(0, 0, 0, 0.32);
+  --md-frost: blur(24px) saturate(1.2);
+
+  /* Shears tokens mapped onto M3 color roles */
+  --bg: var(--md-background);
+  --sidebar: var(--md-background);
+  --surface: var(--md-container-low);
+  --surface-2: var(--md-container-high);
+  --stage: var(--md-container-lowest);
+  --hover: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  --active: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --border: var(--md-outline-variant);
+  --border-strong: color-mix(in srgb, var(--md-outline) 45%, transparent);
+  --text: var(--md-on-surface);
+  --text-2: var(--md-on-surface-variant);
+  --text-3: var(--md-outline);
+  --accent: var(--md-primary);
+  --accent-hover: color-mix(in srgb, var(--md-primary) 85%, white);
+  --primary: var(--md-primary);
+  --primary-hover: var(--md-primary);
+  --on-primary: var(--md-on-primary);
+  --blue: var(--md-primary);
+  --danger: var(--md-error);
+  --warn: #f3c46b;
+  --font: "Google Sans Flex Variable", "Google Sans", system-ui, sans-serif;
+  --shadow: var(--md-elev-3);
+}
+
+/* type: body medium as the base (14/20, +0.25) */
+html,
+body {
+  font: 400 14px/20px var(--font);
+  letter-spacing: 0.25px;
+  background: var(--md-background);
+}
+
+/* ---------- state layers: an overlay in the content's own color (hover 8, focus/press 10, drag 16) ---------- */
+
+:is(
+  .btn,
+  .icon-btn,
+  .tool,
+  .nav-item,
+  .media-item,
+  .media-group-head,
+  .menu-item,
+  .segmented button,
+  .insp-tab,
+  .tl-flag,
+  .tl-add,
+  .chip-btn,
+  .card,
+  .tl-head,
+  .win-btn,
+  .link,
+  .media-empty,
+  .play-btn
+) {
+  background-image: linear-gradient(
+    color-mix(in srgb, currentColor var(--sl), transparent),
+    color-mix(in srgb, currentColor var(--sl), transparent)
+  );
+  transition:
+    --sl var(--md-effects-fast),
+    background-color var(--md-effects),
+    color var(--md-effects),
+    box-shadow var(--md-effects),
+    border-radius var(--md-shape-morph),
+    transform var(--md-spatial-fast);
+}
+
+:is(
+    .btn,
+    .icon-btn,
+    .tool,
+    .nav-item,
+    .media-item,
+    .media-group-head,
+    .menu-item,
+    .segmented button,
+    .insp-tab,
+    .tl-flag,
+    .tl-add,
+    .chip-btn,
+    .card,
+    .tl-head,
+    .win-btn,
+    .link,
+    .media-empty,
+    .play-btn
+  ):hover:not(:disabled) {
+  --sl: 8%;
+}
+
+:is(
+    .btn,
+    .icon-btn,
+    .tool,
+    .nav-item,
+    .media-item,
+    .menu-item,
+    .segmented button,
+    .insp-tab,
+    .tl-flag,
+    .card,
+    .win-btn,
+    .play-btn
+  ):active:not(:disabled) {
+  --sl: 10%;
+}
+
+/* hover colors from the base theme would fight the state layer */
+.icon-btn:hover:not(:disabled),
+.icon-btn.open,
+.tool:hover:not(:disabled),
+.nav-item:hover,
+.media-item:hover,
+.media-group-head:hover,
+.menu-item:hover,
+.btn-ghost:hover,
+.chip-btn:hover,
+.chip-btn.open,
+.tl-add:hover,
+.link:hover {
+  background-color: transparent;
+}
+
+.icon-btn.open,
+.chip-btn.open {
+  --sl: 10%;
+}
+
+/* ---------- background: blurred frame of the open clip, or a soft accent glow ---------- */
+
+.m3-banner {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 18% -10%, var(--md-mesh), transparent 60%),
+    radial-gradient(
+      ellipse at 90% 0%,
+      color-mix(in srgb, var(--md-mesh) 60%, transparent),
+      transparent 55%
+    ),
+    var(--md-background);
+}
+
+.m3-banner-img {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(48px) saturate(1.3);
+  transform: scale(1.08);
+  opacity: 0;
+  transition: opacity var(--md-effects-slow);
+}
+
+.m3-banner-img.show {
+  opacity: 0.4;
+}
+
+.m3-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--md-background) 78%
+  );
+}
+
+.app {
+  background: transparent;
+  grid-template-rows: 52px 1fr;
+}
+
+/* ---------- title bar ---------- */
+
+.titlebar {
+  padding-right: 10px;
+}
+
+.tb-title {
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.win-btn {
+  width: 36px;
+  height: 36px;
+  margin: 0 2px;
+  align-self: center;
+  border-radius: 18px;
+}
+
+.win-btn:hover {
+  background-color: transparent;
+  border-radius: var(--md-shape-m);
+}
+
+.win-btn.close:hover {
+  background-color: #c42b1c;
+  color: #fff;
+}
+
+/* ---------- floating panels (extra large shape, separated by tone) ---------- */
+
+.sidebar {
+  margin: 0 0 16px 16px;
+  padding-top: 12px;
+  border-radius: var(--md-shape-xl);
+  background: var(--md-container-low);
+}
+
+.sb-collapsed .sidebar {
+  margin: 0;
+  padding: 0;
+}
+
+.editor {
+  padding: 0 16px;
+}
+
+.workspace .editor {
+  padding-right: 8px;
+}
+
+.stage {
+  border: 0;
+  border-radius: var(--md-shape-xl);
+}
+
+.panel {
+  border: 0;
+  border-radius: var(--md-shape-xl);
+  background: var(--md-container-low);
+  padding: 8px 8px 0;
+}
+
+.props {
+  padding: 0 16px 16px 4px;
+}
+
+.props-left .props {
+  padding: 0 4px 16px 0;
+}
+
+.statusbar {
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.4px;
+}
+
+/* ---------- buttons: full shape, morphing toward medium when touched ---------- */
+
+.btn {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 20px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.btn:hover:not(:disabled) {
+  border-radius: var(--md-shape-l);
+}
+
+.btn:active:not(:disabled) {
+  border-radius: var(--md-shape-m);
+}
+
+.btn-sm {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+}
+
+.btn-primary,
+.btn-primary:hover {
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--md-elev-1);
+}
+
+.btn-secondary,
+.btn-secondary:hover {
+  border: 0;
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.kbd-on-primary {
+  background: color-mix(in srgb, var(--md-on-primary) 14%, transparent);
+  color: var(--md-on-primary);
+}
+
+kbd {
+  border: 0;
+  border-radius: var(--md-shape-xs);
+  background: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+}
+
+.icon-btn.sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+}
+
+.icon-btn:hover:not(:disabled),
+.icon-btn.open {
+  border-radius: var(--md-shape-m);
+}
+
+.icon-btn.sm:hover:not(:disabled),
+.icon-btn.sm.open {
+  border-radius: var(--md-shape-s);
+}
+
+.toggle-btn.on,
+.toggle-btn.on:hover {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.chip-btn {
+  border-radius: var(--md-shape-s);
+}
+
+/* ---------- sidebar ---------- */
+
+.nav {
+  padding: 0 12px;
+}
+
+.nav-item {
+  height: 48px;
+  border-radius: var(--md-shape-full);
+}
+
+/* "Open video" is the extended FAB */
+.nav-item.primary {
+  height: 56px;
+  border-radius: var(--md-shape-l);
+  background-color: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-weight: 500;
+  box-shadow: var(--md-elev-1);
+}
+
+.nav-item.primary .icon {
+  color: var(--md-on-primary-container);
+}
+
+.nav-item.primary:hover {
+  border-radius: var(--md-shape-xl);
+  background-color: var(--md-primary-container);
+  box-shadow: var(--md-elev-2);
+}
+
+.media-head {
+  padding: 18px 14px 6px 24px;
+}
+
+.media-scroll {
+  padding: 0 12px 12px;
+}
+
+/* inside the 28px sidebar with 12px padding: 16px keeps the corners optically round */
+.media-group-head,
+.media-item {
+  border-radius: var(--md-shape-l);
+}
+
+.media-item.active {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.media-thumb {
+  border-radius: var(--md-shape-s);
+}
+
+.media-empty {
+  border-radius: var(--md-shape-li);
+  border: 2px dashed var(--md-outline-variant);
+}
+
+.avatar {
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+}
+
+.app-mark {
+  color: var(--md-primary);
+}
+
+/* ---------- home ---------- */
+
+.dropzone {
+  border-radius: var(--md-shape-xli);
+  border: 2px dashed var(--md-outline-variant);
+  background: color-mix(in srgb, var(--md-container-low) 85%, transparent);
+  backdrop-filter: var(--md-frost);
+  transition:
+    border-color var(--md-effects),
+    background-color var(--md-effects);
+}
+
+.dropzone:hover {
+  border-color: var(--md-outline);
+  background-color: var(--md-container-low);
+}
+
+.dragging .dropzone {
+  border-color: var(--md-primary);
+  background-color: var(--md-primary-container);
+}
+
+.dz-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--md-shape-l);
+  background: var(--md-primary-container);
+  color: var(--md-primary);
+  transition: border-radius var(--md-shape-morph);
+}
+
+.dropzone:hover .dz-icon {
+  border-radius: var(--md-shape-xl);
+}
+
+/* headline small */
+.dz-title {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.card {
+  border: 0;
+  border-radius: var(--md-shape-xl);
+  background-color: color-mix(
+    in srgb,
+    var(--md-container-low) 88%,
+    transparent
+  );
+  backdrop-filter: var(--md-frost);
+}
+
+.card:hover {
+  border-radius: var(--md-shape-l);
+  background-color: var(--md-container);
+  box-shadow: var(--md-elev-1);
+}
+
+/* 28 - 8 padding = 20 */
+.card-thumb {
+  margin: 8px 8px 0;
+  border-radius: var(--md-shape-li);
+  transition: border-radius var(--md-shape-morph);
+}
+
+.card:hover .card-thumb {
+  border-radius: var(--md-shape-s);
+}
+
+/* ---------- transport ---------- */
+
+.play-btn {
+  width: 56px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.play-btn:hover {
+  background-color: var(--md-primary);
+  border-radius: var(--md-shape-l);
+}
+
+.play-btn:active {
+  border-radius: var(--md-shape-m);
+  transform: scale(0.96);
+}
+
+/* ---------- expressive sliders: thick track, gap around a thin handle ---------- */
+
+.vol-range,
+.range {
+  --v: 0.5;
+  height: 28px;
+}
+
+.vol-range::-webkit-slider-runnable-track,
+.range::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(
+    to right,
+    var(--md-primary) 0 calc((100% - 4px) * var(--v) + 2px - 6px),
+    transparent 0 calc((100% - 4px) * var(--v) + 2px + 6px),
+    var(--md-secondary-container) 0
+  );
+}
+
+.vol-range::-webkit-slider-thumb,
+.range::-webkit-slider-thumb {
+  width: 4px;
+  height: 28px;
+  margin-top: -6px;
+  border-radius: 2px;
+  background: var(--md-primary);
+  transition: width var(--md-spatial-fast);
+}
+
+.vol-range:active::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  width: 2px;
+}
+
+.hue-range::-webkit-slider-thumb {
+  background: var(--md-on-surface);
+}
+
+/* ---------- timeline ---------- */
+
+.toolbar {
+  padding: 0 4px 4px;
+}
+
+.tool {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.tool:hover:not(:disabled) {
+  border-radius: var(--md-shape-m);
+}
+
+.tool-sep {
+  background: var(--md-outline-variant);
+}
+
+/* 28 panel - 8 padding = 20 would be a pill at this height, so large reads better */
+.tl-head {
+  border-radius: var(--md-shape-l);
+  background-color: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+}
+
+.tl-head:hover {
+  background-color: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+}
+
+.tl-head.selected {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.tl-tag {
+  border-radius: var(--md-shape-s);
+}
+
+.tl-head.selected .tl-tag {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+/* dragged items lift to level 4 with a 16% drag state layer */
+.tl-head.dragging {
+  --sl: 16%;
+  background-color: var(--md-container-highest);
+  box-shadow: var(--md-elev-4);
+}
+
+.tl-flag {
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.tl-flag:hover {
+  border-radius: var(--md-shape-s);
+  background-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+}
+
+.tl-flag.mute.on {
+  background-color: var(--md-error);
+  color: var(--md-on-error);
+}
+
+.tl-flag.solo.on {
+  background-color: var(--warn);
+  color: #2b2000;
+}
+
+.tl-flag.link.on {
+  background-color: var(--md-primary-container);
+  color: var(--md-primary);
+}
+
+.tl-add {
+  border-radius: var(--md-shape-full);
+}
+
+.tl-sep {
+  background: var(--md-outline-variant);
+}
+
+/* ---------- inspector ---------- */
+
+.props-title {
+  padding: 4px 6px 12px;
+  letter-spacing: 0.1px;
+}
+
+/* tabs: a connected group where the selected one gets the secondary container */
+.insp-tabs {
+  border: 0;
+  border-radius: var(--md-shape-full);
+  padding: 4px;
+  background: var(--md-container-low);
+}
+
+.insp-tab {
+  height: 40px;
+  border-radius: var(--md-shape-full);
+  font-weight: 500;
+}
+
+.insp-tab.active {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  box-shadow: none;
+}
+
+.props-section {
+  border: 0;
+  border-radius: var(--md-shape-xl);
+  background: var(--md-container-low);
+  padding: 16px;
+}
+
+/* title small */
+.props-heading {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+/* stacked cards share one outline: large outer corners, extra small inner ones */
+.track-list {
+  gap: 2px;
+}
+
+.track-card {
+  border: 0;
+  border-radius: var(--md-shape-xs);
+  background: var(--md-container-low);
+  padding: 12px 14px;
+}
+
+.track-card:first-child {
+  border-top-left-radius: var(--md-shape-li);
+  border-top-right-radius: var(--md-shape-li);
+}
+
+.track-card:last-child {
+  border-bottom-left-radius: var(--md-shape-li);
+  border-bottom-right-radius: var(--md-shape-li);
+}
+
+.input.input-ghost {
+  border-radius: var(--md-shape-s);
+}
+
+.input.input-ghost:focus {
+  box-shadow: none;
+}
+
+/* ---------- connected button groups ---------- */
+
+.segmented {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.segmented button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--md-shape-s);
+  background-color: var(--md-container-high);
+  color: var(--md-on-surface-variant);
+  font-weight: 500;
+}
+
+.segmented button:first-child {
+  border-top-left-radius: 20px;
+  border-bottom-left-radius: 20px;
+}
+
+.segmented button:last-child {
+  border-top-right-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+.segmented button:hover {
+  color: var(--md-on-surface);
+}
+
+/* the selected button becomes fully round */
+.segmented button.active {
+  border-radius: 20px;
+  background-color: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: none;
+}
+
+/* ---------- switches (52 x 32, thumb grows and shows an icon) ---------- */
+
+.switch {
+  width: 52px;
+  height: 32px;
+  border-radius: var(--md-shape-full);
+  background: var(--md-container-highest);
+  box-shadow: inset 0 0 0 2px var(--md-outline);
+  transition:
+    background-color var(--md-effects-fast),
+    box-shadow var(--md-effects-fast);
+}
+
+.switch span {
+  top: 8px;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  background: var(--md-outline);
+  transition:
+    transform var(--md-spatial-fast),
+    width var(--md-spatial-fast),
+    height var(--md-spatial-fast),
+    top var(--md-spatial-fast),
+    left var(--md-spatial-fast),
+    background-color var(--md-effects-fast);
+}
+
+.switch span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--md-container-highest);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M8 8l8 8M16 8l-8 8'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+
+.switch:active span {
+  top: 2px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+}
+
+.switch.on {
+  background: var(--md-primary);
+  box-shadow: none;
+}
+
+.switch.on span {
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  transform: translateX(20px);
+  background: var(--md-on-primary);
+}
+
+.switch.on:active span {
+  top: 2px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+  transform: translateX(20px);
+}
+
+.switch.on span::after {
+  background: var(--md-primary);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 12.5l3.5 3.5 7.5-8'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
+}
+
+/* ---------- fields ---------- */
+
+.input,
+.num-input,
+.file-pick-path {
+  border: 0;
+  border-radius: var(--md-shape-m);
+  background: var(--md-container-highest);
+}
+
+.input:focus,
+.num-input:focus-within {
+  box-shadow: 0 0 0 2px var(--md-primary);
+}
+
+/* ---------- menus, tooltips, toasts and dialogs ---------- */
+
+.menu {
+  border: 0;
+  border-radius: var(--md-shape-l);
+  padding: 6px;
+  background: color-mix(in srgb, var(--md-container) 90%, transparent);
+  backdrop-filter: var(--md-frost);
+  box-shadow: var(--md-elev-2);
+  transform-origin: top;
+  animation: m3-menu-in var(--md-spatial-fast);
+}
+
+@keyframes m3-menu-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.85) translateY(-4px);
+  }
+}
+
+/* 16 - 6 padding = 10 */
+.menu-item {
+  height: 44px;
+  border-radius: 10px;
+}
+
+.menu-check {
+  color: var(--md-primary);
+}
+
+/* ---------- wavy linear progress (M3 Expressive): a moving wave for what's done,
+   a flat track after a small gap, and a stop dot at the end ---------- */
+
+.wavy {
+  --p: 0;
+  display: block;
+  position: relative;
+  height: 12px;
+  margin: 12px 0 2px;
+}
+
+.wavy-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--p) * 100%);
+  overflow: hidden;
+  transition: width var(--md-effects-slow);
+  /* soften the cut-off end of the wave */
+  mask: linear-gradient(to left, transparent, #000 6px);
+}
+
+.wavy-fill svg {
+  display: block;
+  animation: m3-wave 1.1s linear infinite;
+}
+
+.wavy-fill path {
+  fill: none;
+  stroke: var(--md-primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+@keyframes m3-wave {
+  to {
+    transform: translateX(-40px);
+  }
+}
+
+.wavy-track {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  height: 4px;
+  left: min(calc(var(--p) * 100% + 6px), 100%);
+  border-radius: 2px;
+  background: var(--md-secondary-container);
+  transition: left var(--md-effects-slow);
+}
+
+/* the stop indicator */
+.wavy-track::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--md-primary);
+}
+
+/* a glowing edge that follows the pointer: brightest at the nearest point, fading out
+   both ways along the border, and gone once the pointer drifts away from the menu */
+@property --glow-r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 150px;
+}
+
+.menu::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: radial-gradient(
+    var(--glow-r) circle at var(--mx, -999px) var(--my, -999px),
+    var(--md-primary),
+    color-mix(in srgb, var(--md-tertiary) 55%, transparent) 35%,
+    transparent 70%
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: var(--near, 0);
+  transition: opacity var(--md-effects);
+  pointer-events: none;
+  animation: m3-glow-breathe 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes m3-glow-breathe {
+  to {
+    --glow-r: 190px;
+  }
+}
+
+/* right-click menus: M3 dense list items (40dp), growing from the pointer */
+.menu.context {
+  transform-origin: top left;
+  animation: m3-context-in var(--md-spatial-fast);
+}
+
+@keyframes m3-context-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.menu.context .menu-item,
+.menu.submenu .menu-item {
+  height: 36px;
+  font-size: 14px;
+}
+
+/* each submenu level steps up one tonal surface and one elevation level (M3: tone first,
+   shadow second), mostly opaque so it doesn't blend into the menu under it */
+.menu.submenu {
+  animation: m3-context-in var(--md-spatial-fast);
+  background: color-mix(in srgb, var(--md-container-high) 97%, transparent);
+  box-shadow:
+    inset 0 0 0 1px
+      color-mix(in srgb, var(--md-outline-variant) 60%, transparent),
+    var(--md-elev-3);
+}
+
+.menu.submenu.depth-3 {
+  background: color-mix(in srgb, var(--md-container-highest) 98%, transparent);
+  box-shadow:
+    inset 0 0 0 1px
+      color-mix(in srgb, var(--md-outline-variant) 80%, transparent),
+    var(--md-elev-4);
+}
+
+.menu-item.sub-open {
+  --sl: 10%;
+  background-color: transparent;
+}
+
+.tooltip {
+  border: 0;
+  border-radius: var(--md-shape-s);
+  background: color-mix(in srgb, var(--md-container-highest) 92%, transparent);
+  backdrop-filter: var(--md-frost);
+  box-shadow: var(--md-elev-2);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+.toast {
+  border: 0;
+  border-radius: var(--md-shape-l);
+  padding: 14px 14px 14px 18px;
+  background: color-mix(in srgb, var(--md-container-highest) 92%, transparent);
+  backdrop-filter: var(--md-frost);
+  box-shadow: var(--md-elev-3);
+  animation: m3-toast-in var(--md-spatial);
+}
+
+@keyframes m3-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+
+/* scrim: 32% plus a light blur, like Riff */
+.backdrop {
+  background: var(--md-scrim);
+  backdrop-filter: blur(6px);
+}
+
+.modal {
+  border: 0;
+  border-radius: var(--md-shape-xl);
+  padding: 24px;
+  background: color-mix(in srgb, var(--md-container-high) 92%, transparent);
+  backdrop-filter: var(--md-frost);
+  box-shadow: var(--md-elev-3);
+  animation:
+    m3-dialog-in var(--md-spatial),
+    m3-fade-in var(--md-effects);
+}
+
+@keyframes m3-dialog-in {
+  from {
+    transform: scale(0.9) translateY(12px);
+  }
+}
+
+@keyframes m3-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* title large */
+.modal-head h2 {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 400;
+}
+
+/* setting rows become one grouped list */
+.modal .form {
+  gap: 2px;
+}
+
+.modal .form-row {
+  padding: 14px 16px;
+  border-radius: var(--md-shape-xs);
+  background: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+}
+
+.modal .form-row:first-child {
+  border-top-left-radius: var(--md-shape-l);
+  border-top-right-radius: var(--md-shape-l);
+}
+
+.modal .form-row:last-child {
+  border-bottom-left-radius: var(--md-shape-l);
+  border-bottom-right-radius: var(--md-shape-l);
+}
+
+.settings-section {
+  color: var(--md-primary);
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.export-summary,
+.stat,
+.error-log {
+  border-radius: var(--md-shape-l);
+  background: color-mix(in srgb, var(--md-on-surface) 5%, transparent);
+}
+
+.export-frame-wrap {
+  border-radius: var(--md-shape-l);
+}
+
+.done-thumb {
+  border-radius: var(--md-shape-xl);
+}
+
+.done-badge {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow:
+    0 0 0 5px var(--md-container-high),
+    var(--md-elev-3);
+  animation: badge-pop var(--md-spatial) 0.15s both;
+}
+
+.drop-overlay {
+  background: color-mix(in srgb, var(--md-background) 45%, transparent);
+  backdrop-filter: blur(12px) saturate(1.8);
+}
+
+.drop-inner {
+  border-radius: var(--md-shape-xl);
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+}
+
+.dock-marker {
+  border-radius: var(--md-shape-xl);
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+}
+
+.dock-ghost {
+  border: 0;
+  border-radius: var(--md-shape-full);
+  background: var(--md-container-highest);
+  box-shadow: var(--md-elev-3);
+}
+
+.home,
+.media-scroll,
+.props,
+.recents {
+  scrollbar-color: color-mix(in srgb, var(--md-on-surface) 22%, transparent)
+    transparent;
+}
+
+/* ---------- metadata dialog: tonal cards at the large shape ---------- */
+
+.meta-card {
+  border: 0;
+  border-radius: var(--md-shape-li);
+  background: var(--md-container-low);
+}
+
+.meta-chip {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.meta-cols.intro .meta-card {
+  animation: meta-in var(--md-spatial-slow) both;
+}
+
+/* 20 - 14 padding: inner pieces at 12 to stay optically round */
+.ill-map,
+.ill-cal-page {
+  border-radius: var(--md-shape-m);
+}
+
+.ill-map-label {
+  border-radius: var(--md-shape-full);
+}
