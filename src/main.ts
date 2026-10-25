@@ -120,10 +120,12 @@ import {
   menuOpen,
   modal,
   modalOpen,
+  progressBar,
   stem,
   toast,
   type MenuItem,
 } from "./ui";
+import { autoCheck, checkForUpdates, setBeforeInstall } from "./updates";
 
 const VIDEO_EXTS = [
   "mp4",
@@ -291,11 +293,11 @@ function toolsChip() {
   );
 }
 
-function setTitle(text: string) {
-  titleEl.textContent = text;
-  appWindow
-    .setTitle(text === "Shears" ? "Shears" : `${text} — Shears`)
-    .catch(() => {});
+/** The window title: the app's own name on the home screen, "clip.mp4 — Shears" while editing. */
+function setTitle(text: string | null) {
+  const app = store.app.name;
+  titleEl.textContent = text ?? app;
+  appWindow.setTitle(text ? ` — ` : app).catch(() => {});
 }
 
 // ---- sidebar: media pool
@@ -329,7 +331,7 @@ function renderSidebar() {
         h(
           "div",
           { class: "sb-footer-text" },
-          h("div", {}, "Shears"),
+          h("div", {}, store.app.name),
           h("div", { class: "dim" }, toolsLabel())
         )
       ),
@@ -357,25 +359,24 @@ function showSettings() {
       loadTimelineColors();
       session?.tl.invalidate();
     },
+    checkUpdates: () => checkForUpdates(),
   });
 }
 
 /** Reload the UI (used to switch themes), keeping settings, cuts and the open clip. */
 async function restartApp() {
-  if (session) {
-    flushEditSave(session);
+  if (session)
     try {
       sessionStorage.setItem("reopen", session.path);
     } catch {}
-  }
-  await flushSettings().catch(() => {});
+  await flushAll();
   location.reload();
 }
 
 // ---- home
 
 function renderHome() {
-  setTitle("Shears");
+  setTitle(null);
   tbActions.replaceChildren();
   const list = recents.list();
   const card = (r: Recent) =>
@@ -579,14 +580,14 @@ function closeSession(goHome = true) {
 // ---- remembering cuts per clip
 
 let saveTimer = 0;
-let pendingSave: (() => void) | null = null;
+let pendingSave: (() => Promise<void>) | null = null;
 
 function scheduleEditSave(s: Session) {
   if (!store.settings.rememberEdits) return;
   clearTimeout(saveTimer);
   pendingSave = () => {
     pendingSave = null;
-    api
+    return api
       .saveEdit(s.path, s.edit.pristine() ? null : s.edit.doc())
       .catch(() => {});
   };
@@ -595,7 +596,13 @@ function scheduleEditSave(s: Session) {
 
 function flushEditSave(_s: Session) {
   clearTimeout(saveTimer);
-  pendingSave?.();
+  return pendingSave?.() ?? Promise.resolve();
+}
+
+/** Write everything that's waiting to be saved: before closing, restarting or updating. */
+async function flushAll() {
+  if (session) await flushEditSave(session);
+  await flushSettings().catch(() => {});
 }
 
 /** A remembered edit only fits if it was made for a file of the same length. */
@@ -1320,6 +1327,8 @@ async function genThumbs(s: Session, src: string) {
   v.load();
 }
 
+let stageProgress = (_p: number) => {};
+
 function showStageMsg(
   s: Session,
   title: string,
@@ -1328,6 +1337,8 @@ function showStageMsg(
 ) {
   const el = s.els.stageMsg;
   el.hidden = false;
+  const bar = progressBar();
+  stageProgress = bar.set;
   el.replaceChildren(
     h(
       "div",
@@ -1335,9 +1346,7 @@ function showStageMsg(
       progress ? h("div", { class: "spinner" }) : icon(TriangleAlert, 22),
       h("div", { class: "stage-title" }, title),
       h("div", { class: "stage-body" }, body),
-      progress
-        ? h("div", { class: "progress" }, h("div", { class: "progress-fill" }))
-        : null
+      progress ? bar.el : null
     )
   );
 }
@@ -1363,8 +1372,7 @@ async function previewFallback(s: Session) {
     true
   );
   const unlisten = await listen<JobProgress>("job-progress", e => {
-    const fill = s.els.stageMsg.querySelector<HTMLElement>(".progress-fill");
-    if (fill) fill.style.width = `${e.payload.p * 100}%`;
+    stageProgress(e.payload.p);
   });
   try {
     const preview = await api.makePreview(s.path, s.probe.duration, transcode);
@@ -2882,10 +2890,21 @@ function setupChrome() {
   close.append(icon(X, 17, 1.5));
   min.addEventListener("click", () => appWindow.minimize());
   max.addEventListener("click", () => appWindow.toggleMaximize());
-  close.addEventListener("click", () => {
-    if (session) flushEditSave(session);
-    appWindow.close();
-  });
+  close.addEventListener("click", () => appWindow.close());
+  // however the window gets closed (our button, the taskbar, Alt+F4), save first
+  appWindow.onCloseRequested(() => flushAll());
+  if (store.app.channel === "dev")
+    $("btn-sidebar").after(
+      h(
+        "span",
+        {
+          class: "dev-badge",
+          "data-tip": "Local build: its own settings, no automatic updates",
+          "data-tip-pos": "below",
+        },
+        "DEV"
+      )
+    );
   appWindow.onResized(async () => {
     const maximized = await appWindow.isMaximized();
     max.replaceChildren(
@@ -2962,9 +2981,15 @@ function setupChrome() {
 
 async function boot() {
   initTooltips();
-  await loadState();
+  const [, app] = await Promise.all([
+    loadState(),
+    api.appInfo().catch(() => null),
+  ]);
+  if (app) store.app = app;
   theme = await loadTheme(store.settings.theme, store.settings.m3);
   setupChrome();
+  setBeforeInstall(flushAll);
+  autoCheck();
   renderSidebar();
   renderHome();
   requestAnimationFrame(loop);

@@ -59,9 +59,7 @@ pub fn file_key(path: &str) -> String {
 }
 
 pub fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let custom = app
-        .try_state::<Store>()
-        .and_then(|s| s.cache_dir.lock().unwrap().clone());
+    let custom = app.try_state::<Store>().and_then(|s| s.cache_dir.lock().unwrap().clone());
     let dir = match custom {
         Some(d) => d,
         None => app.path().app_cache_dir().map_err(err)?,
@@ -71,10 +69,7 @@ pub fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 fn apply_cache_dir<R: Runtime>(app: &AppHandle<R>, settings: &Value) {
-    let dir = settings["cacheDir"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty())
-        .map(PathBuf::from);
+    let dir = settings["cacheDir"].as_str().filter(|s| !s.trim().is_empty()).map(PathBuf::from);
     if let Some(store) = app.try_state::<Store>() {
         *store.cache_dir.lock().unwrap() = dir;
     }
@@ -89,10 +84,27 @@ pub struct Paths {
     default_cache: String,
 }
 
+/// Reads a saved file. One that exists but can't be read is moved aside (name.broken.json)
+/// instead of being silently overwritten by the next save, and its name is noted in `broken`.
+fn load_or_set_aside(path: &Path, fallback: Value, broken: &mut Vec<String>) -> Value {
+    if !path.exists() {
+        return fallback;
+    }
+    if let Some(v) = read_json(path) {
+        return v;
+    }
+    let aside = path.with_extension("broken.json");
+    if std::fs::rename(path, &aside).is_ok() {
+        broken.push(aside.to_string_lossy().into());
+    }
+    fallback
+}
+
 #[tauri::command]
 pub fn load_state(app: AppHandle) -> Result<Value, String> {
-    let settings = read_json(&config_dir(&app)?.join("settings.json")).unwrap_or(json!({}));
-    let recents = read_json(&data_dir(&app)?.join("recents.json")).unwrap_or(json!([]));
+    let mut broken = Vec::new();
+    let settings = load_or_set_aside(&config_dir(&app)?.join("settings.json"), json!({}), &mut broken);
+    let recents = load_or_set_aside(&data_dir(&app)?.join("recents.json"), json!([]), &mut broken);
     apply_cache_dir(&app, &settings);
     let paths = Paths {
         settings: config_dir(&app)?.join("settings.json").to_string_lossy().into(),
@@ -100,7 +112,7 @@ pub fn load_state(app: AppHandle) -> Result<Value, String> {
         cache: cache_dir(&app)?.to_string_lossy().into(),
         default_cache: app.path().app_cache_dir().map_err(err)?.to_string_lossy().into(),
     };
-    Ok(json!({ "settings": settings, "recents": recents, "paths": paths }))
+    Ok(json!({ "settings": settings, "recents": recents, "paths": paths, "broken": broken }))
 }
 
 /// Saves settings and returns the cache folder now in use.
@@ -142,10 +154,8 @@ pub fn forget_edits(app: AppHandle) -> Result<(), String> {
 
 fn prune_oldest(dir: &Path, keep: usize) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
-    let mut files: Vec<(std::time::SystemTime, PathBuf)> = entries
-        .flatten()
-        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
-        .collect();
+    let mut files: Vec<(std::time::SystemTime, PathBuf)> =
+        entries.flatten().filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path()))).collect();
     if files.len() <= keep {
         return;
     }
@@ -158,25 +168,16 @@ fn prune_oldest(dir: &Path, keep: usize) {
 /// Only files Shears made itself: hash-named files and export temp folders.
 /// The cache can point at any folder, so never touch anything else in it.
 fn is_ours(name: &str) -> bool {
-    name.starts_with("export-")
-        || (name.len() > 16 && name.as_bytes()[..16].iter().all(u8::is_ascii_hexdigit))
+    name.starts_with("export-") || (name.len() > 16 && name.as_bytes()[..16].iter().all(u8::is_ascii_hexdigit))
 }
 
 fn our_entries(dir: &Path) -> Vec<std::fs::DirEntry> {
-    std::fs::read_dir(dir)
-        .map(|it| {
-            it.flatten()
-                .filter(|e| is_ours(&e.file_name().to_string_lossy()))
-                .collect()
-        })
-        .unwrap_or_default()
+    std::fs::read_dir(dir).map(|it| it.flatten().filter(|e| is_ours(&e.file_name().to_string_lossy())).collect()).unwrap_or_default()
 }
 
 fn size_of(path: &Path) -> u64 {
     match std::fs::metadata(path) {
-        Ok(m) if m.is_dir() => std::fs::read_dir(path)
-            .map(|it| it.flatten().map(|e| size_of(&e.path())).sum())
-            .unwrap_or(0),
+        Ok(m) if m.is_dir() => std::fs::read_dir(path).map(|it| it.flatten().map(|e| size_of(&e.path())).sum()).unwrap_or(0),
         Ok(m) => m.len(),
         Err(_) => 0,
     }

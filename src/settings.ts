@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen } from "lucide";
+import { ExternalLink, FolderOpen, RefreshCw } from "lucide";
 
-import { api, type Paths } from "./api";
+import { api, REPO, type AppInfo, type Paths } from "./api";
 import { hueName, type Theme, type ThemeName } from "./themes";
 import type { M3Prefs } from "./themes/m3";
 import {
@@ -55,6 +55,13 @@ export type Settings = {
   /** applies after a restart, only the active theme is loaded */
   theme: ThemeName;
   m3: M3Prefs;
+  updates: {
+    /** look for a new version on startup (release builds only) */
+    auto: boolean;
+    /** a version the user chose to skip */
+    skipped: string | null;
+    lastCheck: number;
+  };
 };
 
 export type Recent = {
@@ -86,6 +93,7 @@ const DEFAULTS: Settings = {
   mediaFolders: [],
   theme: "shears",
   m3: { hue: 220, intensity: 60, brightness: 50 },
+  updates: { auto: true, skipped: null, lastCheck: 0 },
 };
 
 /** Everything that's saved to disk. Read at startup, written back (debounced) on change. */
@@ -93,6 +101,7 @@ export const store = {
   settings: structuredClone(DEFAULTS),
   recents: [] as Recent[],
   paths: { settings: "", data: "", cache: "", defaultCache: "" } as Paths,
+  app: { name: "Shears", version: "", channel: "dev" } as AppInfo,
 };
 
 export async function loadState() {
@@ -105,9 +114,15 @@ export async function loadState() {
       export: { ...DEFAULTS.export, ...saved.export },
       ui: { ...DEFAULTS.ui, ...saved.ui },
       m3: { ...DEFAULTS.m3, ...saved.m3 },
+      updates: { ...DEFAULTS.updates, ...saved.updates },
     };
     store.recents = Array.isArray(s.recents) ? (s.recents as Recent[]) : [];
     store.paths = s.paths;
+    for (const file of s.broken ?? [])
+      toast("A saved file couldn't be read", {
+        body: `It was set aside as ${basename(file)} and Shears started fresh for it.`,
+        error: true,
+      });
   } catch (err) {
     toast("Couldn't load settings", { body: String(err), error: true });
   }
@@ -163,6 +178,7 @@ type SettingsHooks = {
   restart: () => void;
   /** live accent changes need the canvas timeline to pick up the new colors */
   colorsChanged: () => void;
+  checkUpdates: () => void;
 };
 
 export function openSettings(hooks: SettingsHooks) {
@@ -524,9 +540,89 @@ export function openSettings(hooks: SettingsHooks) {
           ),
           `Recents and remembered cuts. Settings are in ${basename(store.paths.settings)} in ${dirname(store.paths.settings)}.`
         )
-      )
+      ),
+      ...updates()
     );
   }
+
+  const updates = () => {
+    const release = store.app.channel === "release";
+    return [
+      h("div", { class: "settings-section" }, "Updates"),
+      h(
+        "div",
+        { class: "form" },
+        row(
+          "Version",
+          h(
+            "div",
+            { class: "inline" },
+            h("span", {}, `${store.app.name} ${store.app.version}`),
+            h(
+              "span",
+              { class: `chip${release ? "" : " warn"}` },
+              release ? "Release" : "Dev build"
+            ),
+            h("div", { class: "spacer" }),
+            h(
+              "button",
+              {
+                class: "btn btn-secondary btn-sm",
+                disabled: !release,
+                onclick: hooks.checkUpdates,
+              },
+              icon(RefreshCw, 14),
+              "Check now"
+            )
+          ),
+          release
+            ? s.updates.lastCheck
+              ? `Last checked ${new Date(s.updates.lastCheck).toLocaleString()}.`
+              : undefined
+            : "Local builds don't update themselves and keep their own settings, so they can sit next to the public release."
+        ),
+        release &&
+          row(
+            "Automatically",
+            h(
+              "div",
+              { class: "inline" },
+              toggle(s.updates.auto, on => ((s.updates.auto = on), changed())),
+              h(
+                "span",
+                { class: "dim small" },
+                "Look for a new version when Shears starts"
+              )
+            )
+          ),
+        row(
+          "Links",
+          h(
+            "div",
+            { class: "inline" },
+            h(
+              "button",
+              {
+                class: "btn btn-ghost btn-sm",
+                onclick: () => api.openUrl(`${REPO}/releases`),
+              },
+              icon(ExternalLink, 14),
+              "Release notes"
+            ),
+            h(
+              "button",
+              {
+                class: "btn btn-ghost btn-sm",
+                onclick: () => api.openUrl(`${REPO}/issues/new`),
+              },
+              icon(ExternalLink, 14),
+              "Report a problem"
+            )
+          )
+        )
+      ),
+    ];
+  };
 
   render();
   refreshCache();

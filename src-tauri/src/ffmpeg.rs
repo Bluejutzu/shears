@@ -18,10 +18,7 @@ pub struct Jobs {
 fn find_bin(name: &str) -> Option<PathBuf> {
     let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
     let mut dirs = Vec::new();
-    if let Some(dir) = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(Path::to_path_buf))
-    {
+    if let Some(dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
         dirs.push(dir);
     }
     if let Some(path) = std::env::var_os("PATH") {
@@ -38,9 +35,7 @@ fn bin(name: &'static str) -> Result<PathBuf, String> {
     static FFMPEG: OnceLock<Option<PathBuf>> = OnceLock::new();
     static FFPROBE: OnceLock<Option<PathBuf>> = OnceLock::new();
     let cell = if name == "ffmpeg" { &FFMPEG } else { &FFPROBE };
-    cell.get_or_init(|| find_bin(name))
-        .clone()
-        .ok_or_else(|| format!("{name} wasn't found. Install it with: winget install Gyan.FFmpeg"))
+    cell.get_or_init(|| find_bin(name)).clone().ok_or_else(|| format!("{name} wasn't found. Install it with: winget install Gyan.FFmpeg"))
 }
 
 fn command(path: &Path) -> Command {
@@ -59,9 +54,7 @@ where
     F: FnOnce() -> Result<T, String> + Send + 'static,
     T: Send + 'static,
 {
-    tauri::async_runtime::spawn_blocking(f)
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())?
 }
 
 fn strs(items: &[&str]) -> Vec<String> {
@@ -121,13 +114,7 @@ pub struct Tools {
 
 #[tauri::command]
 pub async fn tools() -> Result<Tools, String> {
-    blocking(|| {
-        Ok(Tools {
-            ffmpeg: bin("ffmpeg").ok().map(|p| path_str(&p)),
-            encoder: detect_encoder(),
-        })
-    })
-    .await
+    blocking(|| Ok(Tools { ffmpeg: bin("ffmpeg").ok().map(|p| path_str(&p)), encoder: detect_encoder() })).await
 }
 
 #[derive(Serialize, Default)]
@@ -159,7 +146,11 @@ fn ratio(s: &str) -> f64 {
     match s.split_once('/') {
         Some((a, b)) => {
             let (a, b) = (a.parse::<f64>().unwrap_or(0.0), b.parse::<f64>().unwrap_or(0.0));
-            if b > 0.0 { a / b } else { 0.0 }
+            if b > 0.0 {
+                a / b
+            } else {
+                0.0
+            }
         }
         None => s.parse().unwrap_or(0.0),
     }
@@ -170,12 +161,7 @@ fn num<T: std::str::FromStr>(v: &Value) -> Option<T> {
 }
 
 fn ffprobe_json(path: &str, args: &[&str]) -> Result<Value, String> {
-    let out = command(&bin("ffprobe")?)
-        .args(["-v", "error", "-of", "json"])
-        .args(args)
-        .arg(path)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let out = command(&bin("ffprobe")?).args(["-v", "error", "-of", "json"]).args(args).arg(path).output().map_err(|e| e.to_string())?;
     if !out.status.success() {
         return Err(last_lines(&String::from_utf8_lossy(&out.stderr)));
     }
@@ -203,12 +189,7 @@ fn read_probe(path: &str) -> Result<Probe, String> {
                 if p.duration <= 0.0 {
                     p.duration = num(&s["duration"]).unwrap_or(0.0);
                 }
-                p.rotation = s["side_data_list"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .find_map(|d| d["rotation"].as_f64())
-                    .unwrap_or(0.0);
+                p.rotation = s["side_data_list"].as_array().into_iter().flatten().find_map(|d| d["rotation"].as_f64()).unwrap_or(0.0);
             }
             Some("audio") => {
                 p.audio_tracks += 1;
@@ -274,11 +255,7 @@ pub async fn waveform(path: String, track: u32) -> Result<tauri::ipc::Response, 
             .stdout
             .chunks(160)
             .map(|c| {
-                let max = c
-                    .chunks_exact(2)
-                    .map(|b| i16::from_le_bytes([b[0], b[1]]).unsigned_abs())
-                    .max()
-                    .unwrap_or(0);
+                let max = c.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]).unsigned_abs()).max().unwrap_or(0);
                 ((max as f32 / 32768.0).sqrt() * 255.0) as u8
             })
             .collect();
@@ -309,7 +286,8 @@ pub async fn extract_audio(app: AppHandle, path: String, track: u32, codec: Stri
         };
         // copying is instant, but only works for codecs the player can read inside m4a
         let copyable = matches!(codec.as_str(), "aac" | "mp3" | "opus" | "flac" | "alac");
-        if !(copyable && attempt(true)?) && !attempt(false)? {
+        let copied = copyable && attempt(true)?;
+        if !copied && !attempt(false)? {
             let _ = std::fs::remove_file(&tmp);
             return Err("Couldn't read this audio track".into());
         }
@@ -372,12 +350,7 @@ pub async fn list_media(dir: String) -> Result<Vec<MediaFile>, String> {
                     return None;
                 }
                 let modified = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
-                Some(MediaFile {
-                    path: path_str(&p),
-                    name: p.file_name()?.to_string_lossy().into(),
-                    size: meta.len(),
-                    modified,
-                })
+                Some(MediaFile { path: path_str(&p), name: p.file_name()?.to_string_lossy().into(), size: meta.len(), modified })
             })
             .collect();
         files.sort_by(|a, b| b.modified.cmp(&a.modified));
@@ -410,9 +383,7 @@ pub async fn save_frame(input: String, time: f64, output: String, rotate: u32, f
             std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         let mut cmd = command(&bin("ffmpeg")?);
-        cmd.args(["-hide_banner", "-v", "error", "-y", "-ss", &secs(time), "-i"])
-            .arg(&input)
-            .args(["-frames:v", "1"]);
+        cmd.args(["-hide_banner", "-v", "error", "-y", "-ss", &secs(time), "-i"]).arg(&input).args(["-frames:v", "1"]);
         let vf = video_filters(rotate, flip);
         if !vf.is_empty() {
             cmd.args(["-vf", vf.trim_end_matches(',')]);
@@ -506,14 +477,7 @@ fn encoder_args(enc: &str, kbps: Option<f64>) -> Vec<String> {
     match kbps {
         Some(k) => {
             let k = k.round();
-            a.extend(strs(&[
-                "-b:v",
-                &format!("{k}k"),
-                "-maxrate",
-                &format!("{k}k"),
-                "-bufsize",
-                &format!("{}k", k * 2.0),
-            ]));
+            a.extend(strs(&["-b:v", &format!("{k}k"), "-maxrate", &format!("{k}k"), "-bufsize", &format!("{}k", k * 2.0)]));
         }
         None => a.extend(strs(match enc {
             "h264_nvenc" => &["-rc", "vbr", "-cq", "22", "-b:v", "0"][..],
@@ -647,10 +611,7 @@ fn video_filters(rotate: u32, flip: bool) -> String {
 
 impl ExportJob {
     fn ext(&self) -> String {
-        Path::new(&self.output)
-            .extension()
-            .map(|e| e.to_string_lossy().to_lowercase())
-            .unwrap_or_else(|| "mp4".into())
+        Path::new(&self.output).extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_else(|| "mp4".into())
     }
 
     /// Output options every written file gets: the tags, and for mp4/mov the moov atom up front.
@@ -678,8 +639,7 @@ impl ExportJob {
             return Some(vec![]);
         }
         let plain = |s: &AudioSource| s.path.is_none() && s.gain_db.abs() < 0.01;
-        (self.audio == "separate" && self.sources.iter().all(plain))
-            .then(|| self.sources.iter().map(|s| s.track).collect())
+        (self.audio == "separate" && self.sources.iter().all(plain)).then(|| self.sources.iter().map(|s| s.track).collect())
     }
 
     /// Fast copy can't touch pixels, so rotation/flip go into the file's display metadata instead.
@@ -835,8 +795,7 @@ fn meta_args(input: &str, ext: &str, edit: &MetaEdit) -> (Vec<String>, bool) {
         // ffmpeg copies the tags by itself, but mp4/mov drops the Apple-style ones without mdta
         return (vec![], is_mov(ext) && orig.keys().any(dotted));
     }
-    let mut tags: BTreeMap<String, String> =
-        orig.into_iter().filter(|(k, _)| !TECHNICAL.contains(&k.as_str())).collect();
+    let mut tags: BTreeMap<String, String> = orig.into_iter().filter(|(k, _)| !TECHNICAL.contains(&k.as_str())).collect();
     for (k, v) in &edit.tags {
         match v.as_deref().map(str::trim) {
             Some(v) if !v.is_empty() => tags.insert(k.clone(), v.to_string()),
@@ -958,10 +917,7 @@ fn overlay_graph(job: &ExportJob, segs: &[[f64; 2]], video: &mut [String], input
 
 /// Keyframe times of the main video stream, relative to the start of the file.
 fn keyframes(input: &str) -> Result<Vec<f64>, String> {
-    let v = ffprobe_json(
-        input,
-        &["-select_streams", "v:0", "-show_entries", "packet=pts_time,flags:format=start_time"],
-    )?;
+    let v = ffprobe_json(input, &["-select_streams", "v:0", "-show_entries", "packet=pts_time,flags:format=start_time"])?;
     let start = num::<f64>(&v["format"]["start_time"]).unwrap_or(0.0);
     let mut kf: Vec<f64> = v["packets"]
         .as_array()
@@ -997,10 +953,7 @@ fn snap_to_keyframes(segs: &[[f64; 2]], kf: &[f64]) -> Vec<[f64; 3]> {
 /// How long a file's video actually is, used to see where a copied part really starts.
 fn video_duration(path: &str) -> Option<f64> {
     let v = ffprobe_json(path, &["-select_streams", "v:0", "-show_entries", "stream=duration:format=duration"]).ok()?;
-    v["streams"][0]["duration"]
-        .as_str()
-        .or(v["format"]["duration"].as_str())
-        .and_then(|s| s.parse().ok())
+    v["streams"][0]["duration"].as_str().or(v["format"]["duration"].as_str()).and_then(|s| s.parse().ok())
 }
 
 fn same_file(a: &str, b: &str) -> bool {
@@ -1153,10 +1106,7 @@ fn export_encode<R: Runtime>(app: &AppHandle<R>, jobs: &Jobs, job: &ExportJob, s
     // each kept part is its own seeked input, so ffmpeg never decodes the bits we threw away
     let main: Vec<usize> = segs.iter().map(|s| inputs.seek(&job.input, *s)).collect();
     let vf = video_filters(job.rotate, job.flip);
-    let scale = job
-        .height
-        .map(|h| format!("scale=-2:{h}:flags=lanczos,"))
-        .unwrap_or_default();
+    let scale = job.height.map(|h| format!("scale=-2:{h}:flags=lanczos,")).unwrap_or_default();
     for (i, input) in main.iter().enumerate() {
         graph.push_str(&format!("[{input}:v:0]{vf}{scale}format=yuv420p,setsar=1[v{i}];"));
     }
@@ -1182,9 +1132,7 @@ fn export_encode<R: Runtime>(app: &AppHandle<R>, jobs: &Jobs, job: &ExportJob, s
         args.extend(strs(&["-c:a", "aac", "-b:a", &format!("{audio_kbps}k")]));
     }
     // leave a little headroom so we land under the size limit, not just over it
-    let video_kbps = job
-        .target_mb
-        .map(|mb| (mb * 8000.0 * 0.94 / total - audio_kbps * streams as f64).max(150.0));
+    let video_kbps = job.target_mb.map(|mb| (mb * 8000.0 * 0.94 / total - audio_kbps * streams as f64).max(150.0));
     args.extend(encoder_args(&job.encoder, video_kbps));
     job.finish(&mut args);
     args.push(job.output.clone());
@@ -1305,24 +1253,52 @@ mod tests {
             case("copy-gain", &clip, true, "mix", vec![src(0, -6.0)], vec![[3.0, 9.0], [50.0, 55.5]], 11.5, 2.2, 1),
             case("copy-beep", &clip, true, "mix", vec![src(0, 0.0), beep.clone()], vec![[0.0, 8.0], [12.0, 20.0]], 16.0, 0.1, 1),
             case("encode-multi", &clip, false, "mix", vec![src(0, 0.0)], vec![[5.5, 12.25], [40.0, 47.0]], 13.75, 0.1, 1),
-            Case { height: Some(720), target_mb: Some(5.0), ..case("encode-target", &clip, false, "mix", vec![src(0, 0.0)], vec![[0.0, 60.0]], 60.0, 0.1, 1) },
+            Case {
+                height: Some(720),
+                target_mb: Some(5.0),
+                ..case("encode-target", &clip, false, "mix", vec![src(0, 0.0)], vec![[0.0, 60.0]], 60.0, 0.1, 1)
+            },
             case("encode-none", &clip, false, "none", vec![src(0, 0.0)], vec![[30.0, 35.0]], 5.0, 0.1, 0),
             case("encode-beep", &clip, false, "mix", vec![beep.clone()], vec![[2.0, 9.0], [13.0, 14.0]], 8.0, 0.1, 1),
             Case { rotate: 90, ..case("encode-rotate", &clip, false, "mix", vec![src(0, 0.0)], vec![[0.0, 3.0]], 3.0, 0.1, 1) },
-            Case { overlays: vec![logo.clone()], ..case("encode-overlay", &clip, false, "mix", vec![src(0, 0.0)], vec![[2.0, 6.0], [10.0, 14.0]], 8.0, 0.1, 1) },
-            Case { metadata: edit.clone(), want_tags: edited.clone(), ..case("meta-copy", &tagged, true, "separate", vec![src(0, 0.0)], vec![[1.0, 5.0]], 4.0, 2.2, 1) },
-            Case { metadata: edit.clone(), want_tags: edited.clone(), ..case("meta-encode", &tagged, false, "mix", vec![src(0, -2.0)], vec![[1.0, 5.0]], 4.0, 0.1, 1) },
+            Case {
+                overlays: vec![logo.clone()],
+                ..case("encode-overlay", &clip, false, "mix", vec![src(0, 0.0)], vec![[2.0, 6.0], [10.0, 14.0]], 8.0, 0.1, 1)
+            },
+            Case {
+                metadata: edit.clone(),
+                want_tags: edited.clone(),
+                ..case("meta-copy", &tagged, true, "separate", vec![src(0, 0.0)], vec![[1.0, 5.0]], 4.0, 2.2, 1)
+            },
+            Case {
+                metadata: edit.clone(),
+                want_tags: edited.clone(),
+                ..case("meta-encode", &tagged, false, "mix", vec![src(0, -2.0)], vec![[1.0, 5.0]], 4.0, 0.1, 1)
+            },
             Case {
                 metadata: MetaEdit { strip: true, tags: vec![] },
                 want_tags: vec![("title", None), ("com.apple.quicktime.make", None)],
                 ..case("meta-strip", &tagged, false, "mix", vec![src(0, 0.0)], vec![[1.0, 3.0]], 2.0, 0.1, 1)
             },
             // untouched tags survive an export, Apple-style ones included
-            Case { want_tags: vec![("title", Some("Old")), ("com.apple.quicktime.model", Some("iPhone 16 Pro"))], ..case("meta-keep", &tagged, true, "separate", vec![src(0, 0.0)], vec![[0.0, 6.0]], 6.0, 0.2, 1) },
+            Case {
+                want_tags: vec![("title", Some("Old")), ("com.apple.quicktime.model", Some("iPhone 16 Pro"))],
+                ..case("meta-keep", &tagged, true, "separate", vec![src(0, 0.0)], vec![[0.0, 6.0]], 6.0, 0.2, 1)
+            },
             case("mkv-copy-separate", &mkv, true, "separate", vec![src(0, 0.0), src(1, 0.0)], vec![[2.0, 8.0], [10.0, 20.0]], 16.0, 9.0, 2),
             case("mkv-copy-mix", &mkv, true, "mix", vec![src(0, 0.0), src(1, 2.0)], vec![[2.0, 8.0], [10.0, 20.0]], 16.0, 9.0, 1),
             case("mkv-copy-one-muted", &mkv, true, "separate", vec![src(1, 0.0)], vec![[0.0, 30.0]], 30.0, 0.2, 1),
-            case("mkv-encode-separate", &mkv, false, "separate", vec![src(0, 0.0), src(1, -3.0)], vec![[2.0, 8.0], [10.0, 20.0]], 16.0, 0.1, 2),
+            case(
+                "mkv-encode-separate",
+                &mkv,
+                false,
+                "separate",
+                vec![src(0, 0.0), src(1, -3.0)],
+                vec![[2.0, 8.0], [10.0, 20.0]],
+                16.0,
+                0.1,
+                2,
+            ),
         ];
 
         for c in cases {
@@ -1359,7 +1335,13 @@ mod tests {
             );
             // copy mode snaps starts back to keyframes, so it can only come out longer
             if c.copy {
-                assert!(out.duration >= c.want - 0.1 && out.duration <= c.want + c.tol, "{}: duration {} vs {}", c.name, out.duration, c.want);
+                assert!(
+                    out.duration >= c.want - 0.1 && out.duration <= c.want + c.tol,
+                    "{}: duration {} vs {}",
+                    c.name,
+                    out.duration,
+                    c.want
+                );
             } else {
                 assert!((out.duration - c.want).abs() <= c.tol, "{}: duration {} vs {}", c.name, out.duration, c.want);
             }

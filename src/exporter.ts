@@ -20,6 +20,7 @@ import {
   h,
   icon,
   modal,
+  progressBar,
   row,
   segmented,
   toast,
@@ -450,11 +451,8 @@ export async function openExport(opts: {
       `0:00 / ${fmt(outDur, false)}`
     );
     const strip = h("canvas", { class: "export-strip" }) as HTMLCanvasElement;
-    // Material 3's wavy progress bar; the Shears theme hides it
-    const wavy = h("div", { class: "wavy" });
-    let wave = "M0 6";
-    for (let x = 0; x < 2400; x += 40) wave += " q10 -7 20 0 t20 0";
-    wavy.innerHTML = `<div class="wavy-fill"><svg width="2440" height="12" viewBox="0 0 2440 12"><path d="${wave}" /></svg></div><div class="wavy-track"></div>`;
+    // Material 3's wavy bar; in Shears the filmstrip filling up shows progress instead
+    const wavy = progressBar({ flat: false });
     const stat = (label: string) => {
       const value = h("span", { class: "stat-value" }, "–");
       const sub = h("span", { class: "stat-sub" });
@@ -487,7 +485,7 @@ export async function openExport(opts: {
           h("span", {}, `Exporting ${basename(output)}`),
           pct
         ),
-        wavy,
+        wavy.el,
         h(
           "div",
           { class: "export-live" },
@@ -538,7 +536,7 @@ export async function openExport(opts: {
       const { p, fps: renderFps, speed } = e.payload;
       progress = p;
       pct.textContent = `${Math.round(p * 100)}%`;
-      wavy.style.setProperty("--p", String(p));
+      wavy.set(p);
       const done = Math.min(totalFrames, Math.round(p * totalFrames));
       stats.fps.value.textContent =
         renderFps > 0 ? `${Math.round(renderFps)} fps` : "–";

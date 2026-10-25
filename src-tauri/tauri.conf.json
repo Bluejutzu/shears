@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Shears",
-  "version": "0.1.0",
-  "identifier": "dev.bluejutzu.shears",
+  "productName": "Shears Dev",
+  "version": "../package.json",
+  "identifier": "dev.bluejutzu.shears.dev",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Shears",
+        "title": "Shears Dev",
         "width": 1320,
         "height": 840,
         "minWidth": 900,
@@ -41,6 +41,27 @@
         "name": "Video",
         "role": "Viewer"
       }
-    ]
+    ],
+    "publisher": "Bluejutzu",
+    "copyright": "Copyright © 2026 Bluejutzu",
+    "category": "Video",
+    "shortDescription": "A fast, lightweight video cutter",
+    "longDescription": "Open a clip in a second, cut out what you don't need and export it, without waiting for a full editor to start.",
+    "homepage": "https://github.com/Bluejutzu/shears",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBRTlEQTlFNEQ5QUQwMjkKUldRcDBKcE5udHJwdWhNN3ZOd25LWDdtckNXQyszYjFISTNEUzJhNmI4VDFhb1gxOHFsMTJCenEK",
+      "endpoints": ["https://github.com/Bluejutzu/shears/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

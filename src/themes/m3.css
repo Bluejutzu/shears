@@ -1186,29 +1186,59 @@ kbd {
     transparent;
 }
 
-/* ---------- metadata dialog: tonal cards at the large shape ---------- */
+/* ---------- metadata dialog: M3 list-detail, the list in its own tonal pane ---------- */
 
-.meta-card {
-  border: 0;
+.meta-nav {
+  border-right: 0;
+  margin-right: 8px;
+  padding: 8px;
   border-radius: var(--md-shape-li);
   background: var(--md-container-low);
 }
 
-.meta-chip {
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
-}
-
-.meta-cols.intro .meta-card {
-  animation: meta-in var(--md-spatial-slow) both;
-}
-
-/* 20 - 14 padding: inner pieces at 12 to stay optically round */
-.ill-map,
-.ill-cal-page {
-  border-radius: var(--md-shape-m);
-}
-
-.ill-map-label {
+/* 20 - 8 padding = 12, but list items in M3 navigation are full pills */
+.meta-nav-item {
   border-radius: var(--md-shape-full);
+  padding: 10px 14px;
+}
+
+.meta-nav-item:hover {
+  background-color: transparent;
+}
+
+.meta-nav-item.active {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.meta-nav-item.active .icon {
+  color: var(--md-on-secondary-container);
+}
+
+.meta-option {
+  border-top-color: var(--md-outline-variant);
+}
+
+.meta-tech span {
+  border-radius: var(--md-shape-s);
+  background: var(--md-container-high);
+}
+
+/* ---------- updates ---------- */
+
+.update-pill {
+  height: 32px;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.update-notes {
+  border: 0;
+  border-radius: var(--md-shape-l);
+  background: var(--md-container-low);
+}
+
+/* the wavy bar replaces the flat one */
+.wavy + .progress {
+  display: none;
 }

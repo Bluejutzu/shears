@@ -67,6 +67,13 @@ export type MediaFile = {
   modified: number;
 };
 
+export type AppInfo = {
+  name: string;
+  version: string;
+  /** "release" updates from GitHub; "dev" is a local build */
+  channel: "release" | "dev";
+};
+
 export type Paths = {
   settings: string;
   data: string;
@@ -99,6 +106,8 @@ export const api = {
   export: (job: ExportJob) => invoke<number>("export", { job }),
   cancel: () => invoke<void>("cancel"),
   initialFile: () => invoke<string | null>("initial_file"),
+  appInfo: () => invoke<AppInfo>("app_info"),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
   reveal: (path: string) => invoke<void>("reveal", { path }),
   openFolder: (path: string) => invoke<void>("open_folder", { path }),
   uniquePath: (path: string) => invoke<string>("unique_path", { path }),
@@ -107,6 +116,8 @@ export const api = {
       settings: Record<string, unknown>;
       recents: unknown;
       paths: Paths;
+      /** saved files that couldn't be read and were set aside */
+      broken?: string[];
     }>("load_state"),
   saveSettings: (settings: unknown) =>
     invoke<string>("save_settings", { settings }),
@@ -122,6 +133,8 @@ export const api = {
   cacheSize: () => invoke<number>("cache_size"),
   clearCache: () => invoke<void>("clear_cache"),
 };
+
+export const REPO = "https://github.com/Bluejutzu/shears";
 
 export const fileUrl = (path: string) => convertFileSrc(path);
 

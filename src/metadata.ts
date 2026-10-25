@@ -168,107 +168,10 @@ function parseDate(s: string) {
   return isNaN(+d) ? null : d;
 }
 
-// ---- illustrations: all CSS-drawn so they follow the theme
+// ---- dialog: a list of sections on the left, the chosen one on the right
 
-function calendar(d: Date | null) {
-  const el = h("div", { class: `ill-cal${d ? "" : " empty"}` });
-  const month = d ? d.toLocaleString(undefined, { month: "short" }) : "—";
-  const hr = d ? (d.getHours() % 12) * 30 + d.getMinutes() / 2 : 0;
-  const min = d ? d.getMinutes() * 6 : 0;
-  el.append(
-    h(
-      "div",
-      { class: "ill-cal-page" },
-      h("div", { class: "ill-cal-month" }, month.toUpperCase()),
-      h("div", { class: "ill-cal-day" }, d ? String(d.getDate()) : "?"),
-      h(
-        "div",
-        { class: "ill-cal-year" },
-        d ? String(d.getFullYear()) : "No date"
-      )
-    ),
-    h(
-      "div",
-      { class: "ill-clock" },
-      h("i", { class: "hand hr", style: `--a:${hr}deg` }),
-      h("i", { class: "hand min", style: `--a:${min}deg` }),
-      h("i", { class: "hand sec" }),
-      h("b")
-    )
-  );
-  return el;
-}
-
-// the streets drift with the coordinates so different places look different
-const drift = (p: Place | null) =>
-  p
-    ? `translate(${(((p.lon * 37) % 120) - 60) * 0.4}px, ${(((p.lat * 53) % 120) - 60) * 0.3}px) scale(1.25)`
-    : "scale(1.25)";
-
-function map(p: Place | null, from: Place | null) {
-  const el = h("div", { class: `ill-map${p ? "" : " empty"}` });
-  el.innerHTML = `
-    <svg class="ill-map-streets" viewBox="0 0 480 300" preserveAspectRatio="xMidYMid slice" style="transform: ${drift(from ?? p)}">
-      <path class="water" d="M-20 210 C 80 170, 140 260, 240 220 S 400 150, 500 190 L 500 320 L -20 320 Z"/>
-      <rect class="park" x="300" y="40" width="90" height="60" rx="10"/>
-      <rect class="park" x="40" y="70" width="60" height="44" rx="8"/>
-      <g class="roads">
-        <path d="M0 60 H480 M0 130 H480 M120 0 V300 M250 0 V300 M380 0 V300"/>
-        <path class="major" d="M-10 300 L 200 90 L 480 30"/>
-      </g>
-      <g class="lanes"><path d="M0 95 H480 M60 0 V300 M190 0 V300 M320 0 V300 M440 0 V300 M0 165 H480"/></g>
-    </svg>
-    <div class="ill-pin-wrap"><span class="ill-pin-pulse"></span>
-      <svg class="ill-pin" viewBox="0 0 24 32"><path d="M12 31s10-11.2 10-19A10 10 0 0 0 2 12c0 7.8 10 19 10 19z"/><circle cx="12" cy="12" r="4"/></svg>
-    </div>`;
-  el.append(
-    h("div", { class: "ill-map-label" }, p ? placeLabel(p) : "No location")
-  );
-  // pan over from the old spot to the new one
-  if (from) {
-    const svg = el.querySelector<SVGElement>("svg")!;
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => (svg.style.transform = drift(p)))
-    );
-  }
-  return el;
-}
-
-function camera(make: string, model: string) {
-  const known = !!(make || model);
-  const iphone = /iphone/i.test(model) || (/apple/i.test(make) && !model);
-  const lens = (cls: string) =>
-    h("div", { class: `ill-lens ${cls}` }, h("i"), h("b"));
-  const body = iphone
-    ? h(
-        "div",
-        { class: "ill-bump" },
-        lens("l1"),
-        lens("l2"),
-        lens("l3"),
-        h("span", { class: "ill-flash" }),
-        h("span", { class: "ill-lidar" }),
-        h("span", { class: "ill-mic" })
-      )
-    : h(
-        "div",
-        { class: "ill-bump single" },
-        lens("solo"),
-        h("span", { class: "ill-flash" })
-      );
-  return h(
-    "div",
-    { class: `ill-device${known ? "" : " empty"}` },
-    body,
-    h(
-      "div",
-      { class: "ill-device-label" },
-      known ? [make, model].filter(Boolean).join(" · ") : "No device info"
-    )
-  );
-}
-
-// ---- dialog
+type Section = "about" | "date" | "location" | "device" | "tags" | "privacy";
+let lastSection: Section = "about";
 
 export function openMetadata(opts: {
   path: string;
@@ -283,23 +186,7 @@ export function openMetadata(opts: {
   let busy = false;
   let newKey = "";
   let newValue = "";
-  let intro = true;
-
-  // illustrations are kept between renders and only rebuilt when what they show changes,
-  // so their animations play on a change and the looping ones don't restart on every edit
-  const ills = new Map<string, { key: string; el: HTMLElement }>();
-  const memo = (
-    id: string,
-    key: string,
-    make: (prevKey: string | null) => HTMLElement
-  ) => {
-    const hit = ills.get(id);
-    if (hit?.key === key) return hit.el;
-    const el = make(hit?.key ?? null);
-    if (hit) el.classList.add("changed");
-    ills.set(id, { key, el });
-    return el;
-  };
+  let section = lastSection;
 
   // which tag names a field lives under in this file (matching names case-insensitively, mkv shouts)
   const keysOf = (f: Field) => {
@@ -334,6 +221,13 @@ export function openMetadata(opts: {
   const reset = (f: Field) =>
     e.setTags(Object.fromEntries(keysOf(f).map(k => [k, undefined])));
 
+  const otherKeys = () => {
+    const known = new Set(FIELDS.flatMap(f => f.keys).map(lower));
+    return [...new Set([...Object.keys(orig), ...Object.keys(e.meta.tags)])]
+      .filter(k => !known.has(lower(k)) && !TECHNICAL.includes(lower(k)))
+      .sort();
+  };
+
   const body = h("div", { class: "meta" });
   const { close } = modal("Metadata", body, { wide: true });
   body.closest(".modal")?.classList.add("meta-modal");
@@ -359,29 +253,6 @@ export function openMetadata(opts: {
   });
   watch.observe(document.body, { childList: true });
 
-  const card = (
-    ic: IconNode,
-    title: string,
-    sub: string,
-    ...children: (Node | null | false)[]
-  ) =>
-    h(
-      "section",
-      { class: "meta-card" },
-      h(
-        "div",
-        { class: "meta-card-head" },
-        h("span", { class: "meta-chip" }, icon(ic, 16)),
-        h(
-          "div",
-          {},
-          h("div", { class: "meta-card-title" }, title),
-          h("div", { class: "meta-card-sub" }, sub)
-        )
-      ),
-      ...children
-    );
-
   const resetBtn = (f: Field) =>
     edited(f)
       ? h(
@@ -404,7 +275,7 @@ export function openMetadata(opts: {
       onchange: (ev: Event) => set(f, (ev.target as HTMLInputElement).value),
     };
     const el = f.multiline
-      ? (h("textarea", { ...attrs, rows: "2" }) as HTMLTextAreaElement)
+      ? (h("textarea", { ...attrs, rows: "3" }) as HTMLTextAreaElement)
       : (h("input", attrs) as HTMLInputElement);
     el.value = value(f);
     return h(
@@ -417,74 +288,149 @@ export function openMetadata(opts: {
     );
   };
 
-  function aboutCard() {
-    return card(
-      FileText,
-      "About",
-      "What players and file browsers show",
-      h("div", { class: "meta-grid" }, ...ABOUT.map(input))
-    );
-  }
+  // ---- what each section shows
 
-  function dateCard() {
-    const d = parseDate(value(DATE));
-    const field = h("input", {
-      class: "input",
-      type: "datetime-local",
-      step: "1",
-      value: d ? toLocalInput(d) : "",
-      onchange: (ev: Event) => {
-        const v = (ev.target as HTMLInputElement).value;
-        if (!v) return set(DATE, "");
-        const nd = new Date(v);
-        set(DATE, key => dateFor(key, nd));
+  const date = () => parseDate(value(DATE));
+  const place = () => parsePlace(value(LOCATION));
+  const device = () =>
+    [value(MAKE), value(MODEL)].filter(Boolean).join(" ") || "";
+
+  const sections: {
+    id: Section;
+    icon: IconNode;
+    label: string;
+    summary: () => string;
+    changed: () => boolean;
+  }[] = [
+    {
+      id: "about",
+      icon: FileText,
+      label: "About",
+      summary: () => value(ABOUT[0]) || "No title",
+      changed: () => ABOUT.some(edited),
+    },
+    {
+      id: "date",
+      icon: CalendarClock,
+      label: "Recorded",
+      summary: () =>
+        date()?.toLocaleDateString(undefined, { dateStyle: "medium" }) ??
+        "Not set",
+      changed: () => edited(DATE),
+    },
+    {
+      id: "location",
+      icon: MapPin,
+      label: "Location",
+      summary: () => {
+        const p = place();
+        return p ? placeLabel(p) : "Not set";
       },
-    });
-    return card(
-      CalendarClock,
-      "Recorded",
-      d ? d.toLocaleString() : "When it was filmed",
+      changed: () => edited(LOCATION),
+    },
+    {
+      id: "device",
+      icon: Smartphone,
+      label: "Device",
+      summary: () => device() || "Unknown",
+      changed: () => [MAKE, MODEL, SOFTWARE].some(edited),
+    },
+    {
+      id: "tags",
+      icon: Tags,
+      label: "All tags",
+      summary: () => {
+        const n = otherKeys().length;
+        return n ? `${n} more ${n === 1 ? "tag" : "tags"}` : "Add your own";
+      },
+      changed: () => otherKeys().some(k => k in e.meta.tags),
+    },
+    {
+      id: "privacy",
+      icon: ShieldCheck,
+      label: "Privacy",
+      summary: () => (e.meta.strip ? "Stripped on export" : "Tags kept"),
+      changed: () => e.meta.strip,
+    },
+  ];
+
+  const hero = (title: string, sub: string, now?: string) =>
+    h(
+      "div",
+      { class: "meta-hero" },
       h(
         "div",
-        { class: "meta-split" },
-        memo("cal", d ? String(+d) : "", () => calendar(d)),
-        h(
-          "div",
-          { class: "meta-stack" },
-          h(
-            "label",
-            { class: `meta-field${edited(DATE) ? " edited" : ""}` },
-            h("span", { class: "meta-label" }, "Date and time", resetBtn(DATE)),
-            field
-          ),
-          h(
-            "div",
-            { class: "meta-actions" },
-            h(
-              "button",
-              {
-                class: "btn btn-secondary btn-sm",
-                onclick: () => {
-                  const now = new Date();
-                  set(DATE, key => dateFor(key, now));
-                },
-              },
-              "Now"
-            ),
-            d &&
-              h(
-                "button",
-                { class: "btn btn-ghost btn-sm", onclick: () => set(DATE, "") },
-                "Remove"
-              )
-          )
-        )
+        { class: "meta-hero-text" },
+        h("div", { class: "meta-hero-title" }, title),
+        h("div", { class: "meta-hero-sub" }, sub),
+        now ? h("div", { class: "meta-hero-now" }, now) : null
       )
     );
+
+  function aboutView() {
+    return [
+      hero("About", "What players and file browsers show for this clip."),
+      h("div", { class: "meta-grid" }, ...ABOUT.map(input)),
+    ];
   }
 
-  function locationCard() {
-    const p = parsePlace(value(LOCATION));
+  function dateView() {
+    const d = date();
+    return [
+      hero(
+        "Recorded",
+        "When it was filmed. Photo apps sort by this.",
+        d
+          ? d.toLocaleString(undefined, {
+              dateStyle: "full",
+              timeStyle: "short",
+            })
+          : undefined
+      ),
+      h(
+        "label",
+        { class: `meta-field${edited(DATE) ? " edited" : ""}` },
+        h("span", { class: "meta-label" }, "Date and time", resetBtn(DATE)),
+        h("input", {
+          class: "input",
+          type: "datetime-local",
+          step: "1",
+          "data-f": "date",
+          value: d ? toLocalInput(d) : "",
+          onchange: (ev: Event) => {
+            const v = (ev.target as HTMLInputElement).value;
+            if (!v) return set(DATE, "");
+            const nd = new Date(v);
+            set(DATE, key => dateFor(key, nd));
+          },
+        })
+      ),
+      h(
+        "div",
+        { class: "meta-actions" },
+        h(
+          "button",
+          {
+            class: "btn btn-secondary btn-sm",
+            onclick: () => {
+              const now = new Date();
+              set(DATE, key => dateFor(key, now));
+            },
+          },
+          "Set to now"
+        ),
+        d &&
+          h(
+            "button",
+            { class: "btn btn-ghost btn-sm", onclick: () => set(DATE, "") },
+            "Remove date"
+          )
+      ),
+    ];
+  }
+
+  function locationView() {
+    const p = place();
     const coord = (
       label: string,
       v: number | null | undefined,
@@ -497,9 +443,10 @@ export function openMetadata(opts: {
         h("input", {
           class: "input",
           type: "number",
+          "data-f": key,
           step: key === "alt" ? "1" : "0.0001",
           value: v == null ? "" : String(v),
-          placeholder: key === "alt" ? "optional" : "0",
+          placeholder: key === "alt" ? "Optional" : "0",
           onchange: (ev: Event) => {
             const n = parseFloat((ev.target as HTMLInputElement).value);
             const next: Place = {
@@ -509,136 +456,91 @@ export function openMetadata(opts: {
             };
             if (key === "alt") next.alt = isFinite(n) ? n : null;
             else if (isFinite(n))
-              next[key] =
-                key === "lat"
-                  ? Math.max(-90, Math.min(90, n))
-                  : Math.max(-180, Math.min(180, n));
+              next[key] = Math.max(
+                key === "lat" ? -90 : -180,
+                Math.min(key === "lat" ? 90 : 180, n)
+              );
             set(LOCATION, formatPlace(next));
           },
         })
       );
-    return card(
-      MapPin,
-      "Location",
-      p ? "Where it was filmed" : "Not set",
-      memo("map", value(LOCATION), prev =>
-        map(p, prev ? parsePlace(prev) : null)
+    return [
+      hero(
+        "Location",
+        "Where it was filmed. Phones save this automatically.",
+        p
+          ? `${placeLabel(p)}${p.alt != null ? ` · ${Math.round(p.alt)} m up` : ""}`
+          : undefined
       ),
       h(
         "div",
-        { class: "meta-row3" },
+        { class: `meta-row3${edited(LOCATION) ? " edited" : ""}` },
         coord("Latitude", p?.lat, "lat"),
         coord("Longitude", p?.lon, "lon"),
         coord("Altitude (m)", p?.alt, "alt")
       ),
       h(
-        "div",
-        { class: "meta-actions" },
+        "label",
+        { class: "meta-field" },
+        h("span", { class: "meta-label" }, "Paste coordinates"),
         h("input", {
-          class: "input input-sm",
-          placeholder: "Paste coordinates, e.g. 52.52, 13.405",
+          class: "input",
+          placeholder: "52.52, 13.405",
           onchange: (ev: Event) => {
             const el = ev.target as HTMLInputElement;
-            const place = parseLatLon(el.value);
-            if (place) set(LOCATION, formatPlace(place));
+            const parsed = parseLatLon(el.value);
+            if (parsed) set(LOCATION, formatPlace(parsed));
             else toast("Couldn't read those coordinates", { body: el.value });
           },
-        }),
+        })
+      ),
+      h(
+        "div",
+        { class: "meta-actions" },
         edited(LOCATION) &&
           h(
             "button",
-            { class: "btn btn-ghost btn-sm", onclick: () => reset(LOCATION) },
+            {
+              class: "btn btn-secondary btn-sm",
+              onclick: () => reset(LOCATION),
+            },
             "Undo"
           ),
         p &&
           h(
             "button",
             { class: "btn btn-ghost btn-sm", onclick: () => set(LOCATION, "") },
-            "Remove"
+            "Remove location"
           )
-      )
-    );
+      ),
+    ];
   }
 
-  function deviceCard() {
-    return card(
-      Smartphone,
-      "Device",
-      "The camera or phone it came from",
-      h(
-        "div",
-        { class: "meta-split" },
-        memo("cam", `${value(MAKE)}|${value(MODEL)}`, () =>
-          camera(value(MAKE), value(MODEL))
-        ),
-        h(
-          "div",
-          { class: "meta-stack" },
-          input(MAKE),
-          input(MODEL),
-          input(SOFTWARE)
-        )
-      )
-    );
-  }
-
-  function privacyCard() {
-    const hasPrivate = !!(
-      value(LOCATION) ||
-      value(MAKE) ||
-      value(MODEL) ||
-      value(SOFTWARE)
-    );
-    return card(
-      ShieldCheck,
-      "Privacy",
-      "Before sharing a clip",
-      h(
-        "div",
-        { class: "meta-inline" },
-        h(
-          "div",
-          {},
-          h("div", {}, "Strip all metadata on export"),
-          h(
-            "div",
-            { class: "meta-card-sub" },
-            "Exports leave out every tag, location included."
-          )
-        ),
-        toggle(e.meta.strip, v => e.setStrip(v))
+  function deviceView() {
+    return [
+      hero(
+        "Device",
+        "The camera or phone it came from.",
+        device() || undefined
       ),
       h(
-        "button",
-        {
-          class: "btn btn-secondary btn-sm btn-block",
-          disabled: !hasPrivate,
-          onclick: () => {
-            const patch: Record<string, string | null | undefined> = {};
-            for (const f of [LOCATION, MAKE, MODEL, SOFTWARE])
-              for (const k of keysOf(f)) patch[k] = orig[k] ? null : undefined;
-            e.setTags(patch);
-          },
-        },
-        "Remove location and device"
-      )
-    );
+        "div",
+        { class: "meta-grid" },
+        input(MAKE),
+        input(MODEL),
+        input(SOFTWARE)
+      ),
+    ];
   }
 
-  function otherCard() {
-    const known = new Set(FIELDS.flatMap(f => f.keys).map(lower));
-    const keys = [
-      ...new Set([...Object.keys(orig), ...Object.keys(e.meta.tags)]),
-    ]
-      .filter(k => !known.has(lower(k)) && !TECHNICAL.includes(lower(k)))
-      .sort();
+  function tagsView() {
+    const keys = otherKeys();
     const tech = Object.keys(orig).filter(k => TECHNICAL.includes(lower(k)));
-    return card(
-      Tags,
-      "All other tags",
-      keys.length
-        ? `${keys.length} more in this file`
-        : "Add any tag the container supports",
+    return [
+      hero(
+        "All tags",
+        "Everything else stored in the file. Edit, remove or add your own."
+      ),
       h(
         "div",
         { class: "meta-tags" },
@@ -706,40 +608,129 @@ export function openMetadata(opts: {
             },
             icon(Plus, 14)
           )
+        )
+      ),
+      tech.length > 0 &&
+        h(
+          "div",
+          { class: "meta-tech" },
+          h("div", { class: "meta-label" }, "Written by the container"),
+          ...tech.map(k => h("span", {}, h("b", {}, k), orig[k]))
         ),
-        tech.length > 0 &&
+    ];
+  }
+
+  function privacyView() {
+    const hasPrivate = !!(
+      value(LOCATION) ||
+      value(MAKE) ||
+      value(MODEL) ||
+      value(SOFTWARE)
+    );
+    return [
+      hero(
+        "Privacy",
+        "Clips from phones carry where and on what they were filmed."
+      ),
+      h(
+        "div",
+        { class: "meta-option" },
+        h(
+          "div",
+          {},
+          h("div", {}, "Strip all metadata on export"),
           h(
             "div",
-            { class: "meta-tech" },
-            ...tech.map(k => h("span", {}, h("b", {}, k), orig[k]))
+            { class: "meta-hint" },
+            "Exports leave out every tag, location and date included. The original file isn't touched."
           )
-      )
-    );
+        ),
+        toggle(e.meta.strip, v => e.setStrip(v))
+      ),
+      h(
+        "div",
+        { class: "meta-option" },
+        h(
+          "div",
+          {},
+          h("div", {}, "Remove location and device"),
+          h(
+            "div",
+            { class: "meta-hint" },
+            hasPrivate
+              ? "Clears where it was filmed and the phone it came from, keeping the rest."
+              : "There's no location or device info in this clip."
+          )
+        ),
+        h(
+          "button",
+          {
+            class: "btn btn-secondary btn-sm",
+            disabled: !hasPrivate,
+            onclick: () => {
+              const patch: Record<string, string | null | undefined> = {};
+              for (const f of [LOCATION, MAKE, MODEL, SOFTWARE])
+                for (const k of keysOf(f))
+                  patch[k] = orig[k] ? null : undefined;
+              e.setTags(patch);
+            },
+          },
+          "Remove"
+        )
+      ),
+    ];
   }
+
+  const views: Record<Section, () => (Node | false | null)[]> = {
+    about: aboutView,
+    date: dateView,
+    location: locationView,
+    device: deviceView,
+    tags: tagsView,
+    privacy: privacyView,
+  };
 
   function render() {
     const changes = Object.keys(e.meta.tags).length;
-    const scroll = body.querySelector(".meta-scroll")?.scrollTop ?? 0;
+    const detail = body.querySelector(".meta-detail");
+    const scroll = detail?.scrollTop ?? 0;
+    const nav = h(
+      "nav",
+      { class: "meta-nav" },
+      ...sections.map(s =>
+        h(
+          "button",
+          {
+            class: `meta-nav-item${s.id === section ? " active" : ""}`,
+            onclick: () => {
+              if (section === s.id) return;
+              section = lastSection = s.id;
+              render();
+              body.querySelector(".meta-detail")?.scrollTo(0, 0);
+            },
+          },
+          icon(s.icon, 18),
+          h(
+            "span",
+            { class: "meta-nav-text" },
+            h("span", { class: "meta-nav-label" }, s.label),
+            h("span", { class: "meta-nav-sum" }, loaded ? s.summary() : "…")
+          ),
+          s.changed()
+            ? h("span", { class: "meta-dot", "data-tip": "Changed" })
+            : null
+        )
+      )
+    );
+    const pane = h(
+      "div",
+      { class: "meta-detail", "data-section": section },
+      ...(loaded
+        ? views[section]()
+        : [h("div", { class: "meta-loading" }, "Reading tags…")])
+    );
     body.replaceChildren(
-      h(
-        "div",
-        { class: "meta-scroll" },
-        !loaded
-          ? h("div", { class: "meta-loading" }, "Reading tags…")
-          : h(
-              "div",
-              { class: `meta-cols${intro ? " intro" : ""}` },
-              h("div", { class: "meta-col" }, aboutCard(), otherCard()),
-              h(
-                "div",
-                { class: "meta-col" },
-                dateCard(),
-                locationCard(),
-                deviceCard(),
-                privacyCard()
-              )
-            )
-      ),
+      h("div", { class: "meta-body" }, nav, pane),
       h(
         "div",
         { class: "modal-foot meta-foot" },
@@ -749,7 +740,7 @@ export function openMetadata(opts: {
           e.meta.strip
             ? "Exports will leave out all metadata."
             : changes
-              ? `${changes} ${changes === 1 ? "change" : "changes"} · saved with this clip and used when you export`
+              ? `${changes} ${changes === 1 ? "change" : "changes"}, used when you export`
               : `${basename(path)} · nothing changed`
         ),
         changes > 0 &&
@@ -787,10 +778,8 @@ export function openMetadata(opts: {
         )
       )
     );
-    const sc = body.querySelector(".meta-scroll");
-    if (sc) sc.scrollTop = scroll;
-    // the cards only slide in the first time
-    if (loaded) intro = false;
+    const d = body.querySelector(".meta-detail");
+    if (d) d.scrollTop = scroll;
   }
 
   render();

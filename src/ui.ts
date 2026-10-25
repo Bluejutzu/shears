@@ -133,6 +133,30 @@ export const fmtDb = (db: number) =>
     ? "0 dB"
     : `${db > 0 ? "+" : "−"}${Math.abs(db).toFixed(1)} dB`;
 
+/**
+ * A progress bar: flat in the Shears theme, Material 3's wavy line in M3 (the theme's CSS
+ * shows one or the other). `flat: false` leaves the flat one out entirely.
+ */
+export function progressBar({ flat = true } = {}) {
+  const fill = h("div", { class: "progress-fill" });
+  const wavy = h("div", { class: "wavy" });
+  let wave = "M0 6";
+  for (let x = 0; x < 2400; x += 40) wave += " q10 -7 20 0 t20 0";
+  wavy.innerHTML = `<div class="wavy-fill"><svg width="2440" height="12" viewBox="0 0 2440 12"><path d="${wave}" /></svg></div><div class="wavy-track"></div>`;
+  return {
+    el: h(
+      "div",
+      { class: "progress-bar" },
+      wavy,
+      flat ? h("div", { class: "progress" }, fill) : null
+    ),
+    set(p: number) {
+      fill.style.width = `${p * 100}%`;
+      wavy.style.setProperty("--p", String(p));
+    },
+  };
+}
+
 // ---- tooltips: any element with data-tip gets a little dark pill on hover
 
 let tipEl: HTMLElement | null = null;

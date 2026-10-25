@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: bun install --frozen-lockfile
+
+      - name: Format
+        run: |
+          bun run fmt:check
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Frontend (types + build)
+        run: bun run build
+
+      - name: Lint
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+
+      # the export tests need real clips (SHEARS_TEST_DIR) and skip without them
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
