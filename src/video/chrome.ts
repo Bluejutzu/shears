@@ -245,7 +245,7 @@ export async function sendImagesToVideo(
 /** Library images onto the open video at t, picked in a dialog. */
 export async function addFromLibrary(t?: number) {
   const at = t ?? session?.video.currentTime;
-  for (const img of await pickFromLibrary())
+  for (const img of (await pickFromLibrary()) ?? [])
     await addImage(at, img.path, { name: img.name.replace(/\.png$/, "") });
 }
 

@@ -2,7 +2,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { CircleArrowUp } from "lucide";
 
-import { api } from "./api";
+import { api, REPO } from "./api";
 import { saveSettings, store } from "./settings";
 import { fmtSize, h, icon, modal, progressBar, toast } from "./ui";
 
@@ -76,25 +76,36 @@ function showPill(update: Update) {
   document.querySelector(".win-controls")?.before(pill);
 }
 
-/** A line of markdown with its [links](url) as clickable text that opens in the browser. */
+const link = (href: string, label: string) =>
+  h(
+    "a",
+    {
+      href,
+      onclick: (e: MouseEvent) => {
+        e.preventDefault();
+        api.openUrl(href);
+      },
+    },
+    label
+  );
+
+/**
+ * A line of release notes with its links clickable: [markdown](links), bare URLs (a compare
+ * link shows as "v0.1.1…v0.2.0"), #12 for a pull request and a short hash in brackets for a commit.
+ */
 function inline(text: string) {
   const out: (string | Node)[] = [];
   let last = 0;
-  for (const m of text.matchAll(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g)) {
-    out.push(
-      text.slice(last, m.index),
-      h(
-        "a",
-        {
-          href: m[2],
-          onclick: (e: MouseEvent) => {
-            e.preventDefault();
-            api.openUrl(m[2]);
-          },
-        },
-        m[1]
-      )
-    );
+  const re =
+    /\[([^\]]+)\]\((https?:[^)\s]+)\)|(https?:\/\/\S+)|(?<![\w/])#(\d+)\b|\(([0-9a-f]{7,40})\)/g;
+  for (const m of text.matchAll(re)) {
+    out.push(text.slice(last, m.index));
+    if (m[1]) out.push(link(m[2], m[1]));
+    else if (m[3]) {
+      const compare = /\/compare\/(.+)$/.exec(m[3]);
+      out.push(link(m[3], compare ? compare[1].replace("...", " … ") : m[3]));
+    } else if (m[4]) out.push(link(`${REPO}/pull/${m[4]}`, `#${m[4]}`));
+    else out.push("(", link(`${REPO}/commit/${m[5]}`, m[5].slice(0, 7)), ")");
     last = m.index + m[0].length;
   }
   out.push(text.slice(last));
@@ -107,6 +118,9 @@ function notes(text: string) {
   let list: HTMLElement | null = null;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
+    // the dialog already says what this is, and the download hint is for the GitHub page
+    if (/^#{1,6}\s+what's new$/i.test(line) || /^download\b/i.test(line))
+      continue;
     const bullet = /^[-*]\s+(.*)/.exec(line);
     if (bullet) {
       list ??= el.appendChild(h("ul"));
@@ -129,7 +143,7 @@ function notes(text: string) {
 
 function showUpdate(update: Update) {
   const body = h("div", { class: "update" });
-  const { close } = modal("Update available", body);
+  const { close } = modal("Update available", body, { wide: true });
   const date = update.date ? new Date(update.date.replace(" ", "T")) : null;
 
   body.append(
@@ -143,10 +157,13 @@ function showUpdate(update: Update) {
         `You have ${store.app.version}${date && !isNaN(+date) ? ` · released ${date.toLocaleDateString()}` : ""}`
       )
     ),
+    h("div", { class: "update-notes-title" }, "What's new"),
     notes(update.body ?? ""),
     h(
       "div",
       { class: "modal-foot" },
+      link(`${REPO}/releases/tag/v${update.version}`, "Release on GitHub"),
+      h("div", { class: "spacer" }),
       h(
         "button",
         {

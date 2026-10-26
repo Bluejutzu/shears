@@ -59,9 +59,10 @@ const tidy = (line: string) => {
     .replace(/\s*\(#\d+\)$/, "");
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
-const commitLink = (sha: string) =>
-  `[${sha.slice(0, 7)}](${url}/commit/${sha})`;
-const prLink = (n: string) => `[#${n}](${url}/pull/${n})`;
+// plain "#1" and short hashes rather than markdown links: GitHub links them on the release
+// page by itself, and Shears' update window (older builds too) shows them as clean text
+const commitLink = (sha: string) => sha.slice(0, 7);
+const prLink = (n: string) => `#${n}`;
 
 const lines: string[] = [];
 // only main's own line of history: a merged PR counts once, not once per commit inside it
@@ -81,5 +82,5 @@ for (const c of await commits(prev ? `${prev}..${end}` : end)) {
 console.log(`## What's new
 
 ${lines.length ? lines.join("\n") : "- Fixes and small improvements"}
-${prev ? `\n**Full changelog**: [${prev}...${tag}](${url}/compare/${prev}...${tag})\n` : ""}
+${prev ? `\n**Full changelog**: ${url}/compare/${prev}...${tag}\n` : ""}
 Download **Shears_*_x64-setup.exe** below. Shears updates itself from here on.`);

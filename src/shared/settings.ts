@@ -353,15 +353,24 @@ export function openSettings(hooks: SettingsHooks) {
         { class: "form" },
         row(
           "New image size",
-          segmented(
-            Object.entries(SIZES).map(([value, v]) => ({
-              label: v.label,
-              value,
-            })),
-            p.size,
-            v => ((p.size = v), set(), render())
+          h(
+            "select",
+            {
+              class: "input settings-select",
+              onchange: (e: Event) => {
+                p.size = (e.target as HTMLSelectElement).value;
+                set();
+              },
+            },
+            ...Object.entries(SIZES).map(([value, v]) =>
+              h(
+                "option",
+                { value, selected: value === p.size },
+                `${v.label} · ${v.w} × ${v.h}`
+              )
+            )
           ),
-          `${SIZES[p.size]?.w ?? 1920} × ${SIZES[p.size]?.h ?? 1080} px`
+          "The canvas a blank new image starts with"
         ),
         row(
           "Background",

@@ -258,18 +258,12 @@ function drawSidebar() {
 
 // ---- titlebar
 
-const TITLES: Record<View, string> = {
-  library: "Image library",
-  convert: "Convert images",
-  send: "Send to video",
-  editor: "",
-};
-
 function drawChrome() {
   const ed = st.view === "editor" ? st.editor : null;
+  // pages carry their own big heading, so the titlebar only names an open picture
   $("img-title").textContent = ed
     ? `${st.cur.name}${ed.dirty ? " •" : ""}`
-    : TITLES[st.view];
+    : "";
   $("img-actions").replaceChildren(
     ...(ed
       ? [

@@ -741,44 +741,51 @@ kbd {
   box-shadow: none;
 }
 
-/* ---------- connected button groups ---------- */
+/* ---------- segmented buttons: one outlined pill split into options ----------
+   Deliberately unlike the filled action buttons, so a choice never looks like a button
+   that does something. The picked option gets the tonal fill and a check. */
 
 .segmented {
-  gap: 2px;
+  flex-wrap: nowrap;
+  gap: 0;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-full);
   background: none;
+  overflow: hidden;
 }
 
 .segmented button {
-  height: 40px;
-  padding: 0 16px;
-  border-radius: var(--md-shape-s);
-  background-color: var(--md-container-high);
-  color: var(--md-on-surface-variant);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 0;
+  background-color: transparent;
+  color: var(--md-on-surface);
   font-weight: 500;
 }
 
-.segmented button:first-child {
-  border-top-left-radius: 20px;
-  border-bottom-left-radius: 20px;
+.segmented button + button {
+  border-left: 1px solid var(--md-outline);
 }
 
-.segmented button:last-child {
-  border-top-right-radius: 20px;
-  border-bottom-right-radius: 20px;
-}
-
-.segmented button:hover {
-  color: var(--md-on-surface);
-}
-
-/* the selected button becomes fully round */
 .segmented button.active {
-  border-radius: 20px;
-  background-color: var(--md-primary);
-  color: var(--md-on-primary);
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
   box-shadow: none;
+}
+
+.segmented button.active::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 /* ---------- switches (52 x 32, thumb grows and shows an icon) ---------- */
