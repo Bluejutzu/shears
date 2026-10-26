@@ -1,6 +1,6 @@
-import type { MetaEdit } from "../api";
-import { store } from "../settings";
-import { h } from "../ui";
+import type { MetaEdit } from "../shared/api";
+import { store } from "../shared/settings";
+import { h } from "../shared/ui";
 import {
   blobToDataUrl,
   cloneDoc,

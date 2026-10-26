@@ -31,9 +31,9 @@ import {
   type IconNode,
 } from "lucide";
 
-import { openMetadata } from "../metadata";
-import { store } from "../settings";
-import { h, icon, segmented, stem, toggle } from "../ui";
+import { openMetadata } from "../shared/metadata";
+import { store } from "../shared/settings";
+import { h, icon, segmented, stem, toggle } from "../shared/ui";
 import { tipBtn } from "./bits";
 import { swatchStyle } from "./create";
 import { fileToDataUrl, FONTS, type Layer } from "./doc";

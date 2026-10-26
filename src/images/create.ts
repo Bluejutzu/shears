@@ -1,9 +1,18 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { Copy, Upload } from "lucide";
 
-import { api } from "../api";
-import { store } from "../settings";
-import { basename, h, icon, modal, row, segmented, stem, toast } from "../ui";
+import { api } from "../shared/api";
+import { store } from "../shared/settings";
+import {
+  basename,
+  h,
+  icon,
+  modal,
+  row,
+  segmented,
+  stem,
+  toast,
+} from "../shared/ui";
 import {
   blobToDataUrl,
   fileToDataUrl,

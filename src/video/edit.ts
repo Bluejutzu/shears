@@ -1,4 +1,4 @@
-import type { MetaEdit } from "./api";
+import type { MetaEdit } from "../shared/api";
 
 export type Seg = { start: number; end: number; on: boolean };
 

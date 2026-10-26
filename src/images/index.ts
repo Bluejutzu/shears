@@ -12,7 +12,7 @@ import {
   type IconNode,
 } from "lucide";
 
-import { store } from "../settings";
+import { store } from "../shared/settings";
 import {
   h,
   icon,
@@ -22,7 +22,7 @@ import {
   stem,
   toast,
   type MenuItem,
-} from "../ui";
+} from "../shared/ui";
 import { tipBtn } from "./bits";
 import { convertAdd, renderConvert } from "./convert";
 import {

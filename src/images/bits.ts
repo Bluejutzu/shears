@@ -1,6 +1,6 @@
 import { Search as SearchIcon, type IconNode } from "lucide";
 
-import { h, icon, modal } from "../ui";
+import { h, icon, modal } from "../shared/ui";
 
 const escape = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

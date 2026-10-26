@@ -13,8 +13,8 @@ import {
   X,
 } from "lucide";
 
-import { api, fileUrl, type MediaFile } from "./api";
-import { saveSettings, store } from "./settings";
+import { api, fileUrl, type MediaFile } from "../shared/api";
+import { saveSettings, store } from "../shared/settings";
 import {
   ago,
   basename,
@@ -25,7 +25,7 @@ import {
   menu,
   toast,
   type MenuItem,
-} from "./ui";
+} from "../shared/ui";
 
 type Info = { duration: number; thumb: string | null };
 

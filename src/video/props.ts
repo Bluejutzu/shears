@@ -13,8 +13,7 @@ import {
   Trash,
 } from "lucide";
 
-import { api, type Probe } from "./api";
-import type { Edit, Look, Overlay, Track } from "./edit";
+import { api, type Probe } from "../shared/api";
 import {
   basename,
   dirname,
@@ -25,7 +24,8 @@ import {
   modal,
   segmented,
   toggle,
-} from "./ui";
+} from "../shared/ui";
+import type { Edit, Look, Overlay, Track } from "./edit";
 
 type Ctx = {
   path: string;

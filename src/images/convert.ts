@@ -9,8 +9,8 @@ import {
   X,
 } from "lucide";
 
-import { api, fileUrl } from "../api";
-import { saveSettings, store } from "../settings";
+import { api, fileUrl } from "../shared/api";
+import { saveSettings, store } from "../shared/settings";
 import {
   basename,
   ext,
@@ -20,7 +20,7 @@ import {
   segmented,
   toast,
   toggle,
-} from "../ui";
+} from "../shared/ui";
 import {
   convertFile,
   FORMATS,

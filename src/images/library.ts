@@ -1,5 +1,5 @@
-import { api, fileUrl } from "../api";
-import { join } from "../ui";
+import { api, fileUrl } from "../shared/api";
+import { join } from "../shared/ui";
 import type { Doc } from "./doc";
 
 export type ImageItem = {

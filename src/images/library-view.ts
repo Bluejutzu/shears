@@ -11,9 +11,9 @@ import {
   Upload,
 } from "lucide";
 
-import { api } from "../api";
-import { saveSettings, store } from "../settings";
-import { h, icon, menu, row, segmented, type MenuItem } from "../ui";
+import { api } from "../shared/api";
+import { saveSettings, store } from "../shared/settings";
+import { h, icon, menu, row, segmented, type MenuItem } from "../shared/ui";
 import { ask, marked, searchBox } from "./bits";
 import { convertAdd } from "./convert";
 import { importDialog, newDialog, openItem } from "./create";

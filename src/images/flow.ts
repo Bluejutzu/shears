@@ -1,8 +1,8 @@
 import { Check, Film, FolderOpen, Send } from "lucide";
 
-import { fileUrl } from "../api";
-import { saveSettings, store } from "../settings";
-import { h, icon, modal, segmented, toggle } from "../ui";
+import { fileUrl } from "../shared/api";
+import { saveSettings, store } from "../shared/settings";
+import { h, icon, modal, segmented, toggle } from "../shared/ui";
 import { searchBox } from "./bits";
 import { filtered, pathOf, thumbUrl, type ImageItem } from "./library";
 

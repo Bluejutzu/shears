@@ -1,8 +1,8 @@
 import { save } from "@tauri-apps/plugin-dialog";
 
-import { api, fileUrl } from "../api";
-import { openMetadata } from "../metadata";
-import { store, saveSettings } from "../settings";
+import { api, fileUrl } from "../shared/api";
+import { openMetadata } from "../shared/metadata";
+import { store, saveSettings } from "../shared/settings";
 import {
   basename,
   dirname,
@@ -14,7 +14,7 @@ import {
   segmented,
   stem,
   toast,
-} from "../ui";
+} from "../shared/ui";
 import { loadPicture, renderDoc, type Doc } from "./doc";
 import type { ImageEditor } from "./editor";
 

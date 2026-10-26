@@ -14,9 +14,9 @@ import {
   type IconNode,
 } from "lucide";
 
+import { SIZES } from "../images/doc";
+import { libraryDir } from "../images/library";
 import { api, REPO, type AppInfo, type Paths } from "./api";
-import { SIZES } from "./images/doc";
-import { libraryDir } from "./images/library";
 import { hueName, type Theme, type ThemeName } from "./themes";
 import type { M3Prefs } from "./themes/m3";
 import {
@@ -276,8 +276,6 @@ const SECTIONS: {
   { id: "debug", label: "Debug", icon: Bug, group: "Developer" },
 ];
 
-const SHORTCUT_GROUPS = ["Playback", "Editing", "Timeline", "General"];
-
 /** Wrap every searched word in <mark>, skipping the text of inputs. */
 function highlight(root: Node, words: string[]) {
   const re = new RegExp(
@@ -498,7 +496,7 @@ export function openSettings(hooks: SettingsHooks) {
       h(
         "div",
         { class: "sc-grid" },
-        ...SHORTCUT_GROUPS.map(g =>
+        ...[...new Set(all.map(a => a.group))].map(g =>
           h(
             "div",
             { class: "sc-group" },

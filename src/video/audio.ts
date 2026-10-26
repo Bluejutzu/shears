@@ -1,5 +1,5 @@
+import { dbToGain } from "../shared/ui";
 import type { Track } from "./edit";
-import { dbToGain } from "./ui";
 
 type Voice = { el: HTMLAudioElement; gain: GainNode };
 

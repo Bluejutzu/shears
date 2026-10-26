@@ -1,4 +1,4 @@
-import { fileUrl } from "../api";
+import { fileUrl } from "../shared/api";
 
 export type Gradient = { from: string; to: string; angle: number };
 /** null is transparent, a string is a solid color */
