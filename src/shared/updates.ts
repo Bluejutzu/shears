@@ -2,6 +2,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { CircleArrowUp } from "lucide";
 
+import { api } from "./api";
 import { saveSettings, store } from "./settings";
 import { fmtSize, h, icon, modal, progressBar, toast } from "./ui";
 
@@ -75,6 +76,31 @@ function showPill(update: Update) {
   document.querySelector(".win-controls")?.before(pill);
 }
 
+/** A line of markdown with its [links](url) as clickable text that opens in the browser. */
+function inline(text: string) {
+  const out: (string | Node)[] = [];
+  let last = 0;
+  for (const m of text.matchAll(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g)) {
+    out.push(
+      text.slice(last, m.index),
+      h(
+        "a",
+        {
+          href: m[2],
+          onclick: (e: MouseEvent) => {
+            e.preventDefault();
+            api.openUrl(m[2]);
+          },
+        },
+        m[1]
+      )
+    );
+    last = m.index + m[0].length;
+  }
+  out.push(text.slice(last));
+  return out.map(x => (typeof x === "string" ? x.replace(/\*\*/g, "") : x));
+}
+
 /** Release notes are markdown; show headings, bullets and paragraphs without pulling in a parser. */
 function notes(text: string) {
   const el = h("div", { class: "update-notes" });
@@ -84,7 +110,9 @@ function notes(text: string) {
     const bullet = /^[-*]\s+(.*)/.exec(line);
     if (bullet) {
       list ??= el.appendChild(h("ul"));
-      list.append(h("li", {}, bullet[1].replace(/\*\*/g, "")));
+      // indented bullets are a PR's own commits, shown under it
+      const sub = /^\s{2,}[-*]/.test(raw);
+      list.append(h("li", { class: sub ? "sub" : "" }, ...inline(bullet[1])));
       continue;
     }
     list = null;
@@ -93,7 +121,7 @@ function notes(text: string) {
     el.append(
       head
         ? h("div", { class: "update-notes-head" }, head[1])
-        : h("p", {}, line.replace(/\*\*/g, ""))
+        : h("p", {}, ...inline(line))
     );
   }
   if (!el.childNodes.length)
