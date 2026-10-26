@@ -43,8 +43,8 @@ The export tests run against real clips when `SHEARS_TEST_DIR` points at a folde
 ## Release
 
 1. `bun run bump patch` (or `minor`, `major`, `1.2.3`) sets the version everywhere.
-2. Commit, tag and push: `git commit -am "release v1.2.3" && git tag v1.2.3 && git push && git push --tags`.
-3. The Release workflow builds the public **Shears** installer and the signed update files into a draft release. Fill in the notes and publish it; installed copies pick it up on their next start.
+2. Commit it (`git commit -am "release v1.2.3"`) and get it onto `main`, by pushing or by merging the PR. No tag needed.
+3. The Release workflow sees the new version and builds the public **Shears** installer and the signed update files into a draft release. Fill in the notes and publish it: that creates the `v1.2.3` tag, and installed copies pick the update up on their next start.
 
 Updates are signed. The workflow needs two repository secrets: `TAURI_SIGNING_PRIVATE_KEY` (the contents of the private key) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The matching public key is in `src-tauri/tauri.conf.json`. Losing the private key means existing installs can't verify new updates, so keep a backup.
 
