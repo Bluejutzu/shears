@@ -140,12 +140,23 @@ function pump() {
   }
 }
 
+// reused across redraws so thumbnails don't reload and flash
+const thumbImgs = new Map<string, HTMLImageElement>();
+
 function fillInfo(el: HTMLElement, info: Info) {
   const thumb = el.querySelector(".media-thumb")!;
-  if (info.thumb)
-    thumb.replaceChildren(
-      h("img", { src: fileUrl(info.thumb), alt: "", draggable: "false" })
-    );
+  if (info.thumb) {
+    let img = thumbImgs.get(info.thumb);
+    if (!img || img.isConnected) {
+      img = h("img", {
+        src: fileUrl(info.thumb),
+        alt: "",
+        draggable: "false",
+      }) as HTMLImageElement;
+      thumbImgs.set(info.thumb, img);
+    }
+    thumb.replaceChildren(img);
+  }
   const dur = el.querySelector(".media-dur");
   if (dur && info.duration) dur.textContent = fmt(info.duration, false);
 }
