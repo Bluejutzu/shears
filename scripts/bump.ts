@@ -38,5 +38,4 @@ swap(
 
 console.log(`Version is now ${next}. To release it:
   git commit -am "release v${next}"
-  git tag v${next}
-  git push && git push --tags`);
+then get it onto main (push, or merge the PR). The Release workflow builds a draft release.`);

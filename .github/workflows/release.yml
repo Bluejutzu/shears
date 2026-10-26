@@ -1,10 +1,13 @@
 name: Release
 
-# Push a tag like v0.2.0 (see `bun run bump`) to build the installer and the signed
-# updater files. They land in a draft release; publishing it is what ships the update.
+# Merging a version bump into main (see `bun run bump`) builds the installer and the signed
+# updater files into a draft release for that version. Publishing the draft creates the
+# vX.Y.Z tag and ships the update. Pushes that don't change the version do nothing.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,26 +18,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Tag matches package.json
+      - name: New version?
+        id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
-            echo "Tag ${GITHUB_REF_NAME} doesn't match package.json version $version"
-            exit 1
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # a release (draft or not) or a tag for this version means it's already been built
+          if gh release view "$tag" > /dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already has a release, nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: oven-sh/setup-bun@v2
+      - if: steps.version.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@v2
 
-      - uses: dtolnay/rust-toolchain@stable
+      - if: steps.version.outputs.skip != 'true'
+        uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
+      - if: steps.version.outputs.skip != 'true'
+        uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - run: bun install --frozen-lockfile
+      - if: steps.version.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v0
+      - if: steps.version.outputs.skip != 'true'
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -42,8 +55,9 @@ jobs:
         with:
           # the public identity ("Shears") on top of the local "Shears Dev" config
           args: --config src-tauri/tauri.release.conf.json
-          tagName: ${{ github.ref_name }}
-          releaseName: Shears ${{ github.ref_name }}
+          # the tag is made from this commit when the draft gets published
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: Shears ${{ steps.version.outputs.tag }}
           releaseBody: |
             ## What's new
 

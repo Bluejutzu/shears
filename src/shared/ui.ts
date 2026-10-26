@@ -313,6 +313,9 @@ function inTriangle(
   return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 }
 
+/** Dev-build switches that draw the invisible parts of the UI. Set from settings. */
+export const debug = { menuTriangle: false };
+
 /** Opens under (or above) `anchor`, or at a point for right-click menus. */
 export function menu(
   anchor: HTMLElement | { x: number; y: number },
@@ -332,16 +335,50 @@ export function menu(
   // the last few pointer positions, to tell whether it's heading into a submenu
   const trail: { x: number; y: number }[] = [];
 
-  /** Moving from where the pointer was toward the submenu's near edge? (the "safe triangle") */
-  const aiming = (p: Panel) => {
+  /** The "safe triangle": from where the pointer was to the submenu's near edge. */
+  const safeTriangle = (p: Panel) => {
     const c = p.child;
-    if (!c || trail.length < 2) return false;
+    if (!c || trail.length < 2) return null;
     const from = trail[0];
-    const now = trail[trail.length - 1];
-    if (from.x === now.x && from.y === now.y) return false;
     const r = c.el.getBoundingClientRect();
     const x = c.side === "right" ? r.left : r.right;
-    return inTriangle(now, from, { x, y: r.top - 12 }, { x, y: r.bottom + 12 });
+    return [from, { x, y: r.top - 12 }, { x, y: r.bottom + 12 }] as const;
+  };
+
+  /** Moving from where the pointer was toward the submenu's near edge? */
+  const aiming = (p: Panel) => {
+    const tri = safeTriangle(p);
+    const now = trail[trail.length - 1];
+    if (!tri || (tri[0].x === now.x && tri[0].y === now.y)) return false;
+    return inTriangle(now, ...tri);
+  };
+
+  // debug view: the triangle drawn on top, green while the pointer counts as heading into the submenu
+  let debugSvg: SVGSVGElement | null = null;
+  const drawDebug = () => {
+    if (!debug.menuTriangle) {
+      debugSvg?.remove();
+      debugSvg = null;
+      return;
+    }
+    if (!debugSvg) {
+      debugSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      debugSvg.setAttribute("class", "menu-debug");
+      layer.append(debugSvg);
+    }
+    debugSvg.replaceChildren();
+    for (const p of panels.values()) {
+      const tri = safeTriangle(p);
+      if (!tri) continue;
+      const inside = aiming(p);
+      const poly = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "polygon"
+      );
+      poly.setAttribute("points", tri.map(q => `${q.x},${q.y}`).join(" "));
+      poly.setAttribute("class", inside ? "hit" : "");
+      debugSvg.append(poly);
+    }
   };
 
   const closeChild = (p: Panel) => {
@@ -351,6 +388,7 @@ export function menu(
     p.child.anchor.classList.remove("sub-open");
     p.child.el.remove();
     p.child = null;
+    drawDebug();
   };
 
   const openChild = (p: Panel, btn: HTMLElement, sub: MenuItem[]) => {
@@ -500,6 +538,7 @@ export function menu(
   const onMove = (e: PointerEvent) => {
     trail.push({ x: e.clientX, y: e.clientY });
     if (trail.length > 4) trail.shift();
+    drawDebug();
     // where the pointer is relative to each panel, and how close: themes can light the edge with it
     for (const el of layer.querySelectorAll<HTMLElement>(".menu")) {
       const r = el.getBoundingClientRect();

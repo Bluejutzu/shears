@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod imgmeta;
 mod store;
 
 use std::path::Path;
@@ -103,6 +104,16 @@ pub fn run() {
             store::forget_edits,
             store::cache_size,
             store::clear_cache,
+            store::images_load,
+            store::images_save_index,
+            store::image_write,
+            store::image_doc_read,
+            store::image_doc_write,
+            store::image_delete,
+            store::copy_file,
+            store::file_write,
+            imgmeta::image_tags_read,
+            imgmeta::image_tags_write,
             ffmpeg::tools,
             ffmpeg::probe,
             ffmpeg::probe_audio,

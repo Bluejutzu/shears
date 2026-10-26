@@ -9,9 +9,13 @@ import {
   type JobProgress,
   type Probe,
   type Tools,
-} from "./api";
-import type { Edit } from "./edit";
-import { exportPath, saveSettings, store, type ExportPrefs } from "./settings";
+} from "../shared/api";
+import {
+  exportPath,
+  saveSettings,
+  store,
+  type ExportPrefs,
+} from "../shared/settings";
 import {
   basename,
   ext,
@@ -24,7 +28,8 @@ import {
   row,
   segmented,
   toast,
-} from "./ui";
+} from "../shared/ui";
+import type { Edit } from "./edit";
 
 const COPY_UNFRIENDLY = ["mkv", "flv", "ts", "avi", "wmv"];
 

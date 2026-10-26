@@ -13,8 +13,8 @@ import {
   X,
 } from "lucide";
 
-import { api, fileUrl, type MediaFile } from "./api";
-import { saveSettings, store } from "./settings";
+import { api, fileUrl, type MediaFile } from "../shared/api";
+import { saveSettings, store } from "../shared/settings";
 import {
   ago,
   basename,
@@ -25,7 +25,7 @@ import {
   menu,
   toast,
   type MenuItem,
-} from "./ui";
+} from "../shared/ui";
 
 type Info = { duration: number; thumb: string | null };
 
@@ -65,6 +65,11 @@ export async function refreshMedia() {
     })
   );
   if (dirty) changed();
+}
+
+/** Every video in the watched folders. */
+export function poolVideos() {
+  return [...listings.values()].flatMap(l => (Array.isArray(l) ? l : []));
 }
 
 export function startMediaWatch(onChange: () => void) {
@@ -140,12 +145,23 @@ function pump() {
   }
 }
 
+// reused across redraws so thumbnails don't reload and flash
+const thumbImgs = new Map<string, HTMLImageElement>();
+
 function fillInfo(el: HTMLElement, info: Info) {
   const thumb = el.querySelector(".media-thumb")!;
-  if (info.thumb)
-    thumb.replaceChildren(
-      h("img", { src: fileUrl(info.thumb), alt: "", draggable: "false" })
-    );
+  if (info.thumb) {
+    let img = thumbImgs.get(info.thumb);
+    if (!img || img.isConnected) {
+      img = h("img", {
+        src: fileUrl(info.thumb),
+        alt: "",
+        draggable: "false",
+      }) as HTMLImageElement;
+      thumbImgs.set(info.thumb, img);
+    }
+    thumb.replaceChildren(img);
+  }
   const dur = el.querySelector(".media-dur");
   if (dur && info.duration) dur.textContent = fmt(info.duration, false);
 }

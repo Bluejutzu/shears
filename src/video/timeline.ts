@@ -1,7 +1,7 @@
 import { Film, Image, Link2, Link2Off, Plus } from "lucide";
 
+import { dbToGain, fmt, fmtDb, h, icon } from "../shared/ui";
 import type { Edit, Overlay, Track } from "./edit";
-import { dbToGain, fmt, fmtDb, h, icon } from "./ui";
 
 const PAD = 14;
 const RULER = 26;

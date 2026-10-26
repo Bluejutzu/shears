@@ -12,7 +12,6 @@ import {
 } from "lucide";
 
 import { api, type MetaEdit } from "./api";
-import type { Edit } from "./edit";
 import { basename, ext, h, icon, modal, toast, toggle } from "./ui";
 
 /** A field in the dialog and the tag names it can be stored under (first one wins when reading). */
@@ -168,19 +167,35 @@ function parseDate(s: string) {
   return isNaN(+d) ? null : d;
 }
 
+/** What the dialog needs from whatever owns the tags: a video edit, or an open picture. */
+export type MetaHost = {
+  meta: { tags: Record<string, string | null>; strip: boolean };
+  onChange: () => void;
+  setTags: (patch: Record<string, string | null | undefined>) => unknown;
+  setStrip: (strip: boolean) => unknown;
+  clearTags: () => unknown;
+  metaEdit: () => MetaEdit;
+};
+
 // ---- dialog: a list of sections on the left, the chosen one on the right
 
 type Section = "about" | "date" | "location" | "device" | "tags" | "privacy";
 let lastSection: Section = "about";
 
 export function openMetadata(opts: {
-  path: string;
-  edit: Edit;
+  /** the file whose tags to start from, or null for something that isn't saved yet */
+  path: string | null;
+  name?: string;
+  edit: MetaHost;
+  kind?: "video" | "image";
+  read?: (path: string) => Promise<Record<string, string>>;
   /** write the tags into the file (or a copy); resolves once it's done */
-  write: (edit: MetaEdit, output: string | null) => Promise<boolean>;
+  write?: (edit: MetaEdit, output: string | null) => Promise<boolean>;
+  onClose?: () => void;
 }) {
   const { path, edit: e } = opts;
-  const container = ext(path);
+  const noun = opts.kind === "image" ? "image" : "clip";
+  const container = path ? ext(path) : "";
   let orig: Record<string, string> = {};
   let loaded = false;
   let busy = false;
@@ -229,7 +244,10 @@ export function openMetadata(opts: {
   };
 
   const body = h("div", { class: "meta" });
-  const { close } = modal("Metadata", body, { wide: true });
+  const { close } = modal("Metadata", body, {
+    wide: true,
+    onClose: () => void setTimeout(() => opts.onClose?.(), 0),
+  });
   body.closest(".modal")?.classList.add("meta-modal");
   const prevChange = e.onChange;
   let pending = 0;
@@ -369,7 +387,7 @@ export function openMetadata(opts: {
 
   function aboutView() {
     return [
-      hero("About", "What players and file browsers show for this clip."),
+      hero("About", `What players and file browsers show for this ${noun}.`),
       h("div", { class: "meta-grid" }, ...ABOUT.map(input)),
     ];
   }
@@ -379,7 +397,9 @@ export function openMetadata(opts: {
     return [
       hero(
         "Recorded",
-        "When it was filmed. Photo apps sort by this.",
+        opts.kind === "image"
+          ? "When it was taken or made. Photo apps sort by this."
+          : "When it was filmed. Photo apps sort by this.",
         d
           ? d.toLocaleString(undefined, {
               dateStyle: "full",
@@ -630,7 +650,9 @@ export function openMetadata(opts: {
     return [
       hero(
         "Privacy",
-        "Clips from phones carry where and on what they were filmed."
+        opts.kind === "image"
+          ? "Pictures from phones carry where and on what they were taken."
+          : "Clips from phones carry where and on what they were filmed."
       ),
       h(
         "div",
@@ -642,7 +664,9 @@ export function openMetadata(opts: {
           h(
             "div",
             { class: "meta-hint" },
-            "Exports leave out every tag, location and date included. The original file isn't touched."
+            opts.kind === "image"
+              ? "The exported picture leaves out every tag, location and date included."
+              : "Exports leave out every tag, location and date included. The original file isn't touched."
           )
         ),
         toggle(e.meta.strip, v => e.setStrip(v))
@@ -659,7 +683,7 @@ export function openMetadata(opts: {
             { class: "meta-hint" },
             hasPrivate
               ? "Clears where it was filmed and the phone it came from, keeping the rest."
-              : "There's no location or device info in this clip."
+              : `There's no location or device info in this ${noun}.`
           )
         ),
         h(
@@ -741,7 +765,7 @@ export function openMetadata(opts: {
             ? "Exports will leave out all metadata."
             : changes
               ? `${changes} ${changes === 1 ? "change" : "changes"}, used when you export`
-              : `${basename(path)} · nothing changed`
+              : `${opts.name ?? (path ? basename(path) : noun)} · nothing changed`
         ),
         changes > 0 &&
           h(
@@ -749,28 +773,31 @@ export function openMetadata(opts: {
             { class: "btn btn-ghost", onclick: () => e.clearTags() },
             "Undo all"
           ),
-        h(
-          "button",
-          {
-            class: "btn btn-secondary",
-            disabled: busy || (!changes && !e.meta.strip),
-            "data-tip":
-              "Rewrites the original file with these tags. Video and audio aren't touched.",
-            onclick: async () => {
-              busy = true;
-              render();
-              const done = await opts.write(e.metaEdit(), null);
-              busy = false;
-              if (done) {
-                orig = await api.readTags(path).catch(() => orig);
-                e.clearTags();
-                if (e.meta.strip) e.setStrip(false);
-              }
-              render();
+        opts.write &&
+          h(
+            "button",
+            {
+              class: "btn btn-secondary",
+              disabled: busy || (!changes && !e.meta.strip),
+              "data-tip":
+                "Rewrites the original file with these tags. Video and audio aren't touched.",
+              onclick: async () => {
+                busy = true;
+                render();
+                const done = await opts.write!(e.metaEdit(), null);
+                busy = false;
+                if (done) {
+                  orig = await (opts.read ?? api.readTags)(path!).catch(
+                    () => orig
+                  );
+                  e.clearTags();
+                  if (e.meta.strip) e.setStrip(false);
+                }
+                render();
+              },
             },
-          },
-          busy ? "Writing…" : "Write into file"
-        ),
+            busy ? "Writing…" : "Write into file"
+          ),
         h(
           "button",
           { class: "btn btn-primary", onclick: () => close() },
@@ -783,8 +810,7 @@ export function openMetadata(opts: {
   }
 
   render();
-  api
-    .readTags(path)
+  (path ? (opts.read ?? api.readTags)(path) : Promise.resolve({}))
     .then(t => (orig = t))
     .catch(() => {})
     .finally(() => {

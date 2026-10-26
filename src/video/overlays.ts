@@ -1,6 +1,6 @@
-import { fileUrl } from "./api";
+import { fileUrl } from "../shared/api";
+import { h } from "../shared/ui";
 import type { Edit, Overlay } from "./edit";
-import { h } from "./ui";
 
 export const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif", "bmp"];
 

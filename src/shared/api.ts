@@ -130,6 +130,27 @@ export const api = {
     invoke<Record<string, string>>("read_tags", { path }),
   writeMetadata: (input: string, output: string | null, edit: MetaEdit) =>
     invoke<void>("write_metadata", { input, output, edit }),
+  imagesLoad: () =>
+    invoke<{ dir: string; index: Record<string, unknown> }>("images_load"),
+  imagesSaveIndex: (index: unknown) =>
+    invoke<void>("images_save_index", { index }),
+  imageWrite: (id: string, png: Uint8Array) =>
+    invoke<string>("image_write", png, { headers: { "x-id": id } }),
+  imageDocRead: (id: string) =>
+    invoke<unknown | null>("image_doc_read", { id }),
+  imageDocWrite: (id: string, doc: unknown) =>
+    invoke<void>("image_doc_write", { id, doc }),
+  imageDelete: (id: string) => invoke<void>("image_delete", { id }),
+  fileWrite: (path: string, bytes: Uint8Array) =>
+    invoke<void>("file_write", bytes, {
+      headers: { "x-path": encodeURIComponent(path) },
+    }),
+  imageTagsRead: (path: string) =>
+    invoke<Record<string, string>>("image_tags_read", { path }),
+  imageTagsWrite: (path: string, edit: MetaEdit) =>
+    invoke<void>("image_tags_write", { path, edit }),
+  copyFile: (from: string, to: string) =>
+    invoke<void>("copy_file", { from, to }),
   cacheSize: () => invoke<number>("cache_size"),
   clearCache: () => invoke<void>("clear_cache"),
 };
