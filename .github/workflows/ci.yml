@@ -9,9 +9,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+
 jobs:
-  check:
-    runs-on: windows-latest
+  fmt:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -19,25 +23,56 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run fmt:check
+
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      # types + build
+      - run: bun run build
+
+  clippy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - run: bun install --frozen-lockfile
+      # tauri's generate_context! only needs frontendDist to exist
+      - run: mkdir dist
 
-      - name: Format
-        run: |
-          bun run fmt:check
-          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
 
-      - name: Frontend (types + build)
-        run: bun run build
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: mkdir dist
 
       # the export tests need real clips (SHEARS_TEST_DIR) and skip without them
-      - name: Test
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
