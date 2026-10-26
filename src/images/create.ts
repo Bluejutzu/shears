@@ -3,16 +3,7 @@ import { Copy, Upload } from "lucide";
 
 import { api } from "../shared/api";
 import { store } from "../shared/settings";
-import {
-  basename,
-  h,
-  icon,
-  modal,
-  row,
-  segmented,
-  stem,
-  toast,
-} from "../shared/ui";
+import { basename, h, icon, modal, row, stem, toast } from "../shared/ui";
 import {
   blobToDataUrl,
   fileToDataUrl,
@@ -301,18 +292,24 @@ export function newDialog() {
               h(
                 "div",
                 {},
-                segmented(
-                  Object.entries(SIZES).map(([value, v]) => ({
-                    label: v.label,
-                    value,
-                  })),
-                  size,
-                  v => {
-                    size = v;
-                    w = SIZES[v].w;
-                    hgt = SIZES[v].h;
-                    render();
-                  }
+                h(
+                  "select",
+                  {
+                    class: "input settings-select",
+                    onchange: (e: Event) => {
+                      size = (e.target as HTMLSelectElement).value;
+                      w = SIZES[size].w;
+                      hgt = SIZES[size].h;
+                      render();
+                    },
+                  },
+                  ...Object.entries(SIZES).map(([value, v]) =>
+                    h(
+                      "option",
+                      { value, selected: value === size },
+                      `${v.label} · ${v.w} × ${v.h}`
+                    )
+                  )
                 ),
                 h(
                   "div",

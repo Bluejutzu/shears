@@ -80,7 +80,7 @@ function draw() {
     if (Array.isArray(files))
       convertAdd(files.map(path => ({ path, name: basename(path) })));
   };
-  const addLibrary = async () => convertAdd(await pickFromLibrary());
+  const addLibrary = async () => convertAdd((await pickFromLibrary()) ?? []);
 
   const list = rows.length
     ? h(
