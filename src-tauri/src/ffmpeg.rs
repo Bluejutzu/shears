@@ -255,7 +255,7 @@ pub async fn waveform(path: String, track: u32) -> Result<tauri::ipc::Response, 
             .stdout
             .chunks(160)
             .map(|c| {
-                let max = c.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]).unsigned_abs()).max().unwrap_or(0);
+                let max = c.as_chunks::<2>().0.iter().map(|b| i16::from_le_bytes(*b).unsigned_abs()).max().unwrap_or(0);
                 ((max as f32 / 32768.0).sqrt() * 255.0) as u8
             })
             .collect();
@@ -353,7 +353,7 @@ pub async fn list_media(dir: String) -> Result<Vec<MediaFile>, String> {
                 Some(MediaFile { path: path_str(&p), name: p.file_name()?.to_string_lossy().into(), size: meta.len(), modified })
             })
             .collect();
-        files.sort_by(|a, b| b.modified.cmp(&a.modified));
+        files.sort_by_key(|a| std::cmp::Reverse(a.modified));
         Ok(files)
     })
     .await
@@ -532,7 +532,7 @@ fn prune_previews(keep: &Path) {
         })
         .filter_map(|p| Some((std::fs::metadata(&p).ok()?.modified().ok()?, p)))
         .collect();
-    previews.sort_by(|a, b| b.0.cmp(&a.0));
+    previews.sort_by_key(|a| std::cmp::Reverse(a.0));
     for (_, p) in previews.into_iter().skip(3) {
         if p != keep {
             let _ = std::fs::remove_file(p);

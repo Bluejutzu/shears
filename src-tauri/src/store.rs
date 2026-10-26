@@ -159,7 +159,7 @@ fn prune_oldest(dir: &Path, keep: usize) {
     if files.len() <= keep {
         return;
     }
-    files.sort_by(|a, b| b.0.cmp(&a.0));
+    files.sort_by_key(|a| std::cmp::Reverse(a.0));
     for (_, p) in files.into_iter().skip(keep) {
         let _ = std::fs::remove_file(p);
     }
