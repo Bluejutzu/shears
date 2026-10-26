@@ -85,6 +85,8 @@ import {
   imageShortcuts,
   initImages,
   leaveImages,
+  pickFromLibrary,
+  type Placement,
 } from "./images";
 import {
   addMediaFolder,
@@ -318,7 +320,6 @@ function setTitle(text: string | null) {
 function renderSidebar() {
   const scroll = sidebarEl.querySelector(".media-scroll")?.scrollTop ?? 0;
   sidebarEl.replaceChildren(
-    modeSwitch(),
     h(
       "nav",
       { class: "nav" },
@@ -335,54 +336,67 @@ function renderSidebar() {
       removeRecent: p => recents.remove(p),
       addAudio: session ? p => addAudioTrack(undefined, p) : undefined,
     }),
-    h(
-      "div",
-      { class: "sb-footer" },
-      h(
-        "div",
-        { class: "sb-footer-id" },
-        h("div", { class: "avatar" }, appMark(15)),
-        h(
-          "div",
-          { class: "sb-footer-text" },
-          h("div", {}, store.app.name),
-          h("div", { class: "dim" }, toolsLabel())
-        )
-      ),
-      h(
-        "div",
-        { class: "sb-footer-actions" },
-        iconBtn(House, "Home", null, () => closeSession()),
-        iconBtn(Keyboard, "Keyboard shortcuts", "?", showShortcuts),
-        iconBtn(SettingsIcon, "Settings", "Ctrl ,", showSettings)
-      )
-    )
+    sidebarFooter(() => closeSession())
   );
   const scroller = sidebarEl.querySelector(".media-scroll");
   if (scroller) scroller.scrollTop = scroll;
+}
+
+/** The app name, tools and settings at the bottom of both sidebars. */
+function sidebarFooter(home: () => void) {
+  return h(
+    "div",
+    { class: "sb-footer" },
+    h(
+      "div",
+      { class: "sb-footer-id" },
+      h("div", { class: "avatar" }, appMark(15)),
+      h(
+        "div",
+        { class: "sb-footer-text" },
+        h("div", {}, store.app.name),
+        h("div", { class: "dim" }, toolsLabel())
+      )
+    ),
+    h(
+      "div",
+      { class: "sb-footer-actions" },
+      iconBtn(House, "Home", null, home),
+      iconBtn(Keyboard, "Keyboard shortcuts", "?", showShortcuts),
+      iconBtn(SettingsIcon, "Settings", "Ctrl ,", showSettings)
+    )
+  );
 }
 const showSettings = () => openSettingsAt();
 
 // ---- the two apps: the video editor and the image editor
 
-function modeSwitch() {
-  const tab = (mode: "video" | "image", label: string, ic: IconNode) =>
+const modeSwitchEl = h("div", { class: "mode-switch", role: "tablist" });
+
+function renderModeSwitch() {
+  const tab = (
+    mode: "video" | "image",
+    tip: string,
+    key: string,
+    ic: IconNode
+  ) =>
     h(
       "button",
       {
         class: appMode === mode ? "active" : "",
-        "data-tip": label === "Video" ? "Video editor" : "Image editor",
-        "data-key": mode === "video" ? "Ctrl 1" : "Ctrl 2",
+        role: "tab",
+        "aria-selected": String(appMode === mode),
+        "aria-label": tip,
+        "data-tip": tip,
+        "data-key": key,
+        "data-tip-pos": "below",
         onclick: () => setMode(mode),
       },
-      icon(ic, 16),
-      h("span", {}, label)
+      icon(ic, 16)
     );
-  return h(
-    "div",
-    { class: "mode-switch" },
-    tab("video", "Video", Film),
-    tab("image", "Images", ImageIcon)
+  modeSwitchEl.replaceChildren(
+    tab("video", "Video editor", "Ctrl 1", Film),
+    tab("image", "Image editor", "Ctrl 2", ImageIcon)
   );
 }
 
@@ -390,6 +404,7 @@ function setMode(mode: "video" | "image") {
   if (mode === appMode) return;
   appMode = mode;
   document.body.dataset.mode = mode;
+  renderModeSwitch();
   if (mode === "image") {
     session?.video.pause();
     enterImages();
@@ -399,22 +414,41 @@ function setMode(mode: "video" | "image") {
   }
 }
 
-/** Put library images on a video, each on its own image track at the playhead. */
+/** Put library images on a video, each on its own image track. */
 async function sendImagesToVideo(
-  paths: string[],
+  images: { path: string; name: string }[],
   video: string,
-  seconds: number
+  p: Placement
 ) {
   setMode("video");
   if (session?.path !== video) await openFile(video);
-  if (session?.path !== video) return;
-  for (const p of paths) await addImage(undefined, p, seconds);
+  const s = session;
+  if (s?.path !== video) return;
+  const first =
+    p.start === "playhead"
+      ? s.video.currentTime
+      : p.start === "start"
+        ? 0
+        : p.start;
+  let at = first;
+  for (const img of images) {
+    await addImage(at, img.path, { ...p, name: img.name });
+    if (p.sequence) at += p.seconds;
+  }
+  seek(Math.min(first, s.probe.duration));
   toast(
-    paths.length === 1
+    images.length === 1
       ? "Image added to the video"
-      : `${paths.length} images added to the video`,
+      : `${images.length} images added to the video`,
     { body: basename(video) }
   );
+}
+
+/** Library images onto the open video at t, picked in a dialog. */
+async function addFromLibrary(t?: number) {
+  const at = t ?? session?.video.currentTime;
+  for (const img of await pickFromLibrary())
+    await addImage(at, img.path, { name: img.name.replace(/\.png$/, "") });
 }
 
 document.addEventListener("keydown", e => {
@@ -814,7 +848,17 @@ function frameSize(s: Session): [number, number] {
 }
 
 /** Lay an image over the video from t (the playhead by default) for up to 5 seconds. */
-async function addImage(at?: number, file?: string, seconds = 5) {
+type ImageOpts = {
+  seconds?: number;
+  name?: string;
+  /** -1, 0 or 1 across and down */
+  anchor?: [number, number];
+  /** width as a fraction of the frame */
+  scale?: number;
+  fill?: boolean;
+};
+
+async function addImage(at?: number, file?: string, opts: ImageOpts = {}) {
   const s = session;
   if (!s) return;
   const picked =
@@ -831,19 +875,27 @@ async function addImage(at?: number, file?: string, seconds = 5) {
     const dur = s.probe.duration;
     const start = clamp(at ?? s.video.currentTime, 0, Math.max(0, dur - 0.1));
     const [fw, fh] = frameSize(s);
-    s.edit.addItems(
-      [
-        newOverlay(
-          picked,
-          stem(picked),
-          Math.round(start * 1000) / 1000,
-          Math.max(0.1, Math.min(seconds, dur - start)),
-          size.w / size.h,
-          fw / fh
-        ),
-      ],
-      []
+    const o = newOverlay(
+      picked,
+      opts.name ?? stem(picked),
+      Math.round(start * 1000) / 1000,
+      Math.max(0.1, Math.min(opts.seconds ?? 5, dur - start)),
+      size.w / size.h,
+      fw / fh
     );
+    if (opts.fill) o.scale = 1;
+    else if (opts.scale) o.scale = opts.scale;
+    if (opts.anchor && !opts.fill) {
+      // a small margin from the edges; the height follows from the picture's shape
+      const m = 0.04;
+      const tall = (o.scale * (fw / fh)) / (size.w / size.h);
+      o.x =
+        Math.round((0.5 + opts.anchor[0] * (0.5 - o.scale / 2 - m)) * 1000) /
+        1000;
+      o.y =
+        Math.round((0.5 + opts.anchor[1] * (0.5 - tall / 2 - m)) * 1000) / 1000;
+    }
+    s.edit.addItems([o], []);
   } catch {
     toast("Couldn't read that image", { body: basename(picked), error: true });
   }
@@ -2033,6 +2085,11 @@ const addMenu = (t: number): MenuItem => ({
       run: () => addImage(t),
     },
     {
+      label: "From the image library…",
+      icon: ImageIcon,
+      run: () => addFromLibrary(t),
+    },
+    {
       label: "Audio here…",
       icon: FileMusic,
       hint: hint("ctrl+shift+a"),
@@ -2398,6 +2455,11 @@ function timelineMenu(target: Target, ev: MouseEvent) {
         run: () => addImage(t),
       },
       {
+        label: "From the image library…",
+        icon: ImageIcon,
+        run: () => addFromLibrary(t),
+      },
+      {
         label: "Add audio here…",
         icon: FileMusic,
         hint: hint("ctrl+shift+a"),
@@ -2451,6 +2513,11 @@ function stageMenu(ev: MouseEvent) {
       icon: ImagePlus,
       hint: hint("ctrl+shift+i"),
       run: () => addImage(t),
+    },
+    {
+      label: "From the image library…",
+      icon: ImageIcon,
+      run: () => addFromLibrary(t),
     },
     {
       label: "Paste",
@@ -2966,6 +3033,8 @@ function setupChrome() {
         "DEV"
       )
     );
+  $("btn-sidebar").parentElement!.append(modeSwitchEl);
+  renderModeSwitch();
   appWindow.onResized(async () => {
     const maximized = await appWindow.isMaximized();
     max.replaceChildren(
@@ -3066,7 +3135,7 @@ async function boot() {
   startMediaWatch(renderSidebar);
   document.body.dataset.mode = "video";
   initImages({
-    modeSwitch,
+    footer: () => sidebarFooter(() => {}),
     showSettings,
     showShortcuts,
     browseVideo: async () => {
@@ -3079,11 +3148,17 @@ async function boot() {
     },
     videos: () => {
       const seen = new Set<string>();
-      const out: { path: string; name: string; current: boolean }[] = [];
+      const out: {
+        path: string;
+        name: string;
+        current: boolean;
+        thumb?: string;
+      }[] = [];
       const add = (path: string, current = false) => {
         if (seen.has(path)) return;
         seen.add(path);
-        out.push({ path, name: basename(path), current });
+        const thumb = store.recents.find(r => r.path === path)?.thumb;
+        out.push({ path, name: basename(path), current, thumb });
       };
       if (session) add(session.path, true);
       for (const r of store.recents) add(r.path);

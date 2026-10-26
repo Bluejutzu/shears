@@ -1,5 +1,4 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { FolderOpen } from "lucide";
+import { save } from "@tauri-apps/plugin-dialog";
 
 import { api, fileUrl } from "../api";
 import { openMetadata } from "../metadata";
@@ -9,14 +8,12 @@ import {
   dirname,
   ext,
   h,
-  icon,
   join,
   modal,
   row,
   segmented,
   stem,
   toast,
-  toggle,
 } from "../ui";
 import { loadPicture, renderDoc, type Doc } from "./doc";
 import type { ImageEditor } from "./editor";
@@ -267,186 +264,41 @@ export function exportDialog(editor: ImageEditor, name: string) {
   render();
 }
 
-/** Turn existing picture files into another type, keeping their metadata when asked. */
-export function convertDialog(files: { path: string; name: string }[]) {
-  const p = store.settings.images;
-  let format = (
-    ["png", "jpeg", "webp"].includes(p.format) ? p.format : "png"
-  ) as Format;
-  let quality = p.quality;
-  let keep = true;
-  let flatten = "#ffffff";
-  let folder: string | null = null;
-  let busy = false;
-  let done = 0;
-  const body = h("div", { class: "form" });
-  const { close } = modal("Convert images", body);
+export type ConvertOpts = {
+  format: Format;
+  quality: number;
+  /** behind see-through parts, for JPEG */
+  flatten: string;
+  /** copy the original's tags into the new file */
+  keep: boolean;
+  /** null = next to the original */
+  folder: string | null;
+};
 
-  const render = () => {
-    const f = fmtOf(format);
-    const same = files.filter(x => formatOf(x.path) === format).length;
-    body.replaceChildren(
-      row(
-        "Files",
-        h(
-          "div",
-          { class: "dim small" },
-          files.length === 1 ? files[0].name : `${files.length} images`
-        )
-      ),
-      row(
-        "Convert to",
-        segmented(
-          FORMATS.map(x => ({ label: x.label, value: x.value })),
-          format,
-          v => {
-            format = v;
-            render();
-          }
-        ),
-        same
-          ? `${same} of them ${same === 1 ? "is" : "are"} already ${f.label}; they'll be saved again as a copy.`
-          : undefined
-      ),
-      ...(lossy(format) ? [qualityRow(quality, v => (quality = v))] : []),
-      ...(format === "jpeg"
-        ? [
-            row(
-              "Background",
-              h("input", {
-                class: "color-input",
-                type: "color",
-                value: flatten,
-                oninput: (e: Event) =>
-                  (flatten = (e.target as HTMLInputElement).value),
-              }),
-              "Shown wherever a picture is see-through."
-            ),
-          ]
-        : []),
-      row(
-        "Metadata",
-        h(
-          "div",
-          { class: "inline" },
-          toggle(keep, on => ((keep = on), render())),
-          h(
-            "span",
-            { class: "dim small" },
-            !holdsTags(format)
-              ? `${f.label} files can't hold metadata`
-              : keep
-                ? "Copy tags over from the originals"
-                : "Leave them out"
-          )
-        )
-      ),
-      row(
-        "Save to",
-        h(
-          "div",
-          { class: "file-pick" },
-          h(
-            "div",
-            { class: "file-pick-path" },
-            h(
-              "span",
-              { class: folder ? "" : "dim" },
-              folder ?? "Next to each original"
-            )
-          ),
-          h(
-            "button",
-            {
-              class: "btn btn-secondary btn-sm",
-              onclick: async () => {
-                const d = await open({ directory: true });
-                if (typeof d === "string") {
-                  folder = d;
-                  render();
-                }
-              },
-            },
-            icon(FolderOpen, 14),
-            "Choose"
-          )
-        )
-      ),
-      h(
-        "div",
-        { class: "modal-foot" },
-        h(
-          "button",
-          { class: "btn btn-ghost", onclick: () => close() },
-          "Cancel"
-        ),
-        h(
-          "button",
-          {
-            class: "btn btn-primary",
-            disabled: busy,
-            onclick: async () => {
-              busy = true;
-              p.format = format;
-              p.quality = quality;
-              saveSettings();
-              let failed = 0;
-              let last = "";
-              for (const file of files) {
-                try {
-                  const img = await loadPicture(fileUrl(file.path));
-                  const c = document.createElement("canvas");
-                  c.width = img.naturalWidth;
-                  c.height = img.naturalHeight;
-                  c.getContext("2d")!.drawImage(img, 0, 0);
-                  const bytes = await encode(c, format, quality, 1, flatten);
-                  const out = await api.uniquePath(
-                    join(
-                      folder ?? dirname(file.path),
-                      `${stem(file.path)}.${f.ext}`
-                    )
-                  );
-                  await api.fileWrite(out, bytes);
-                  if (keep && holdsTags(format)) {
-                    const tags = await api
-                      .imageTagsRead(file.path)
-                      .catch(() => ({}));
-                    if (Object.keys(tags).length)
-                      await api.imageTagsWrite(out, {
-                        strip: false,
-                        tags: Object.entries(tags),
-                      });
-                  }
-                  last = out;
-                } catch {
-                  failed++;
-                }
-                done++;
-                render();
-              }
-              close();
-              toast(
-                failed
-                  ? `Converted ${files.length - failed} of ${files.length}`
-                  : files.length === 1
-                    ? "Image converted"
-                    : `${files.length} images converted`,
-                {
-                  body: failed ? "Some files couldn't be read" : undefined,
-                  error: failed === files.length,
-                  action: last
-                    ? { label: "Show", run: () => api.reveal(last) }
-                    : undefined,
-                }
-              );
-            },
-          },
-          busy ? `Converting ${done} of ${files.length}…` : "Convert"
-        )
-      )
-    );
-  };
-  render();
+export const holdsMeta = holdsTags;
+export const isLossy = lossy;
+
+/** Turn one picture file into another type and return where the new file went. */
+export async function convertFile(path: string, o: ConvertOpts) {
+  const img = await loadPicture(fileUrl(path));
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  c.getContext("2d")!.drawImage(img, 0, 0);
+  const bytes = await encode(c, o.format, o.quality, 1, o.flatten);
+  const out = await api.uniquePath(
+    join(o.folder ?? dirname(path), `${stem(path)}.${fmtOf(o.format).ext}`)
+  );
+  await api.fileWrite(out, bytes);
+  if (o.keep && holdsTags(o.format)) {
+    const tags = await api.imageTagsRead(path).catch(() => ({}));
+    if (Object.keys(tags).length)
+      await api.imageTagsWrite(out, {
+        strip: false,
+        tags: Object.entries(tags),
+      });
+  }
+  return { out, size: bytes.length };
 }
 
 export type { Doc };

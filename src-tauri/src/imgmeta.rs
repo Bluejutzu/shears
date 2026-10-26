@@ -88,32 +88,33 @@ fn latin1(b: &[u8]) -> String {
     b.iter().map(|&c| c as char).collect()
 }
 
-fn png_read(b: &[u8]) -> Result<Tags, String> {
-    let mut tags = Tags::new();
-    for c in png_chunks(b)? {
-        let Some(z) = c.data.iter().position(|&x| x == 0) else { continue };
-        let key = latin1(&c.data[..z]);
-        let rest = &c.data[z + 1..];
-        let value = match &c.kind {
-            b"tEXt" => latin1(rest),
-            // flag, method, language\0, translated keyword\0, text (skipped when compressed)
-            b"iTXt" if rest.first() == Some(&0) && rest.len() > 2 => {
-                let after = &rest[2..];
-                let Some(a) = after.iter().position(|&x| x == 0) else { continue };
-                let Some(t) = after[a + 1..].iter().position(|&x| x == 0) else { continue };
-                String::from_utf8_lossy(&after[a + 1 + t + 1..]).into_owned()
-            }
-            _ => continue,
-        };
-        if key == "XML:com.adobe.xmp" {
-            continue;
+/// A text chunk we read and write ourselves, as (tag name, value). Compressed ones and the
+/// XMP packet aren't ours, so they're left alone.
+fn text_tag(c: &Chunk) -> Option<(String, String)> {
+    let z = c.data.iter().position(|&x| x == 0)?;
+    let key = latin1(&c.data[..z]);
+    let rest = &c.data[z + 1..];
+    let value = match &c.kind {
+        b"tEXt" => latin1(rest),
+        // flag, method, language\0, translated keyword\0, text (skipped when compressed)
+        b"iTXt" if rest.first() == Some(&0) && rest.len() > 2 => {
+            let after = &rest[2..];
+            let a = after.iter().position(|&x| x == 0)?;
+            let t = after[a + 1..].iter().position(|&x| x == 0)?;
+            String::from_utf8_lossy(&after[a + 1 + t + 1..]).into_owned()
         }
-        let name = PNG_NAMES.iter().find(|(_, k)| k.eq_ignore_ascii_case(&key)).map_or(key, |(n, _)| n.to_string());
-        tags.insert(name, value);
+        _ => return None,
+    };
+    if key == "XML:com.adobe.xmp" {
+        return None;
     }
-    Ok(tags)
+    let name = PNG_NAMES.iter().find(|(_, k)| k.eq_ignore_ascii_case(&key)).map_or(key, |(n, _)| n.to_string());
+    Some((name, value))
 }
 
+fn png_read(b: &[u8]) -> Result<Tags, String> {
+    Ok(png_chunks(b)?.iter().filter_map(text_tag).collect())
+}
 fn png_chunk(kind: &[u8; 4], data: &[u8], out: &mut Vec<u8>) {
     out.extend((data.len() as u32).to_be_bytes());
     out.extend(kind);
@@ -126,7 +127,8 @@ fn png_write(b: &[u8], edit: &MetaEdit) -> Result<Vec<u8>, String> {
     let tags = apply(png_read(b)?, edit);
     let mut out = PNG_SIG.to_vec();
     for (n, c) in chunks.iter().enumerate() {
-        if is_text(&c.kind) || (edit.strip && &c.kind == b"eXIf") {
+        // ours get written again below; the rest only go when stripping everything
+        if text_tag(c).is_some() || (edit.strip && (is_text(&c.kind) || &c.kind == b"eXIf")) {
             continue;
         }
         png_chunk(&c.kind, c.data, &mut out);
@@ -405,6 +407,13 @@ mod tests {
         assert_eq!(t["mood"], "calm");
         let b = png_write(&b, &edit(&[("title", None)])).unwrap();
         assert!(!png_read(&b).unwrap().contains_key("title"));
+        let mut z = b.clone();
+        let end = z.len() - 12;
+        let mut ztxt = Vec::new();
+        png_chunk(b"zTXt", b"Raw\0\0xyz", &mut ztxt);
+        z.splice(end..end, ztxt);
+        let kept = png_write(&z, &edit(&[("title", Some("New"))])).unwrap();
+        assert!(kept.windows(4).any(|w| w == b"zTXt"));
         let b = png_write(&b, &MetaEdit { strip: true, tags: vec![] }).unwrap();
         assert!(png_read(&b).unwrap().is_empty());
         assert!(b.windows(4).any(|w| w == b"IDAT"));

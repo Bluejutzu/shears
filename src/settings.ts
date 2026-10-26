@@ -249,15 +249,31 @@ type SectionId =
   | "shortcuts"
   | "debug";
 
-const SECTIONS: { id: SectionId; label: string; icon: IconNode }[] = [
-  { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "saving", label: "Saving", icon: Save },
-  { id: "history", label: "History", icon: History },
-  { id: "images", label: "Image editor", icon: ImageIcon },
-  { id: "storage", label: "Storage", icon: HardDrive },
-  { id: "updates", label: "Updates", icon: RefreshCw },
-  { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
-  { id: "debug", label: "Debug", icon: Bug },
+const SECTIONS: {
+  id: SectionId;
+  label: string;
+  icon: IconNode;
+  /** heading the section is listed under in the nav */
+  group: string;
+}[] = [
+  {
+    id: "appearance",
+    label: "Appearance",
+    icon: Palette,
+    group: "Preferences",
+  },
+  { id: "saving", label: "Saving", icon: Save, group: "Preferences" },
+  { id: "history", label: "History", icon: History, group: "Preferences" },
+  {
+    id: "shortcuts",
+    label: "Keyboard shortcuts",
+    icon: Keyboard,
+    group: "Preferences",
+  },
+  { id: "images", label: "Image editor", icon: ImageIcon, group: "Editors" },
+  { id: "storage", label: "Storage", icon: HardDrive, group: "This computer" },
+  { id: "updates", label: "Updates", icon: RefreshCw, group: "This computer" },
+  { id: "debug", label: "Debug", icon: Bug, group: "Developer" },
 ];
 
 const SHORTCUT_GROUPS = ["Playback", "Editing", "Timeline", "General"];
@@ -394,16 +410,8 @@ export function openSettings(hooks: SettingsHooks) {
         ),
         row(
           "Snapping",
-          h(
-            "div",
-            { class: "inline" },
-            toggle(p.snap, on => ((p.snap = on), set(), render())),
-            h(
-              "span",
-              { class: "dim small" },
-              "Snap to the canvas edges and middle while dragging"
-            )
-          )
+          toggle(p.snap, on => ((p.snap = on), set(), render())),
+          "Snap to the canvas edges and middle while dragging. Hold Shift to skip it."
         ),
         row(
           "On the video",
@@ -425,12 +433,9 @@ export function openSettings(hooks: SettingsHooks) {
                 set();
               },
             }),
-            h(
-              "span",
-              { class: "dim small" },
-              "seconds each image shows when sent to a video"
-            )
-          )
+            h("span", { class: "dim small" }, "seconds")
+          ),
+          "How long each image shows when you send it to a video"
         ),
         row(
           "Export as",
@@ -477,20 +482,12 @@ export function openSettings(hooks: SettingsHooks) {
       { class: "form" },
       row(
         "Menu triangle",
-        h(
-          "div",
-          { class: "inline" },
-          toggle(s.debug.menuTriangle, on => {
-            s.debug.menuTriangle = on;
-            debug.menuTriangle = on;
-            changed();
-          }),
-          h(
-            "span",
-            { class: "dim small" },
-            "Draw the invisible area that keeps a submenu open while you move toward it"
-          )
-        )
+        toggle(s.debug.menuTriangle, on => {
+          s.debug.menuTriangle = on;
+          debug.menuTriangle = on;
+          changed();
+        }),
+        "Draw the invisible area that keeps a submenu open while you move toward it"
       )
     ),
   ];
@@ -761,19 +758,8 @@ export function openSettings(hooks: SettingsHooks) {
           { class: "form" },
           row(
             "Remember cuts",
-            h(
-              "div",
-              { class: "inline" },
-              toggle(
-                s.rememberEdits,
-                on => ((s.rememberEdits = on), changed())
-              ),
-              h(
-                "span",
-                { class: "dim small" },
-                "Reopening a clip brings back your cuts, marks and track settings"
-              )
-            )
+            toggle(s.rememberEdits, on => ((s.rememberEdits = on), changed())),
+            "Reopening a clip brings back your cuts, marks and track settings"
           ),
           row(
             "Recent clips",
@@ -901,7 +887,10 @@ export function openSettings(hooks: SettingsHooks) {
     };
 
     navList.replaceChildren(
-      ...sections.map(sec =>
+      ...sections.flatMap((sec, i) => [
+        ...(sec.group !== sections[i - 1]?.group
+          ? [h("div", { class: "settings-group" }, sec.group)]
+          : []),
         h(
           "button",
           {
@@ -915,8 +904,8 @@ export function openSettings(hooks: SettingsHooks) {
           },
           icon(sec.icon, 18),
           h("span", {}, sec.label)
-        )
-      )
+        ),
+      ])
     );
 
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -1002,16 +991,8 @@ export function openSettings(hooks: SettingsHooks) {
         release &&
           row(
             "Automatically",
-            h(
-              "div",
-              { class: "inline" },
-              toggle(s.updates.auto, on => ((s.updates.auto = on), changed())),
-              h(
-                "span",
-                { class: "dim small" },
-                "Look for a new version when Shears starts"
-              )
-            )
+            toggle(s.updates.auto, on => ((s.updates.auto = on), changed())),
+            "Look for a new version when Shears starts"
           ),
         row(
           "Links",

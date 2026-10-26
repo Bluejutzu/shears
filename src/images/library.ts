@@ -79,7 +79,11 @@ export async function saveItem(
   png: Uint8Array,
   doc: Doc
 ) {
-  await api.imageWrite(meta.id, png);
+  const file = await api.imageWrite(meta.id, png);
+  // the tags go into the library copy too, so converting it later keeps them
+  const tags = Object.entries(doc.meta?.tags ?? {}).filter(([, v]) => v);
+  if (tags.length && !doc.meta?.strip)
+    await api.imageTagsWrite(file, { strip: false, tags }).catch(() => {});
   await api.imageDocWrite(meta.id, doc);
   const now = Date.now();
   const at = items.findIndex(i => i.id === meta.id);
