@@ -1657,6 +1657,26 @@ kbd {
   display: contents;
 }
 
+.menu-debug {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.menu-debug polygon {
+  fill: rgba(255, 77, 141, 0.22);
+  stroke: #ff4d8d;
+  stroke-width: 1.5;
+}
+
+.menu-debug polygon.hit {
+  fill: rgba(60, 220, 120, 0.25);
+  stroke: #3cdc78;
+}
+
 .menu-chev {
   display: grid;
   color: var(--text-3);

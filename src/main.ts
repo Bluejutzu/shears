@@ -22,6 +22,7 @@ import {
   Crosshair,
   Download,
   Film,
+  Image as ImageIcon,
   FileMusic,
   FoldHorizontal,
   FolderOpen,
@@ -78,7 +79,19 @@ import {
 import { AudioEngine } from "./audio";
 import { Edit, type Doc, type Look, type Overlay, type Track } from "./edit";
 import { openExport } from "./exporter";
-import { addMediaFolder, renderMediaPool, startMediaWatch } from "./media";
+import {
+  enterImages,
+  imageDrop,
+  imageShortcuts,
+  initImages,
+  leaveImages,
+} from "./images";
+import {
+  addMediaFolder,
+  poolVideos,
+  renderMediaPool,
+  startMediaWatch,
+} from "./media";
 import { openMetadata } from "./metadata";
 import {
   getImage,
@@ -112,6 +125,7 @@ import {
   fmt,
   fmtDb,
   fmtSize,
+  debug,
   h,
   icon,
   initTooltips,
@@ -206,6 +220,7 @@ type Session = {
 };
 
 let session: Session | null = null;
+let appMode: "video" | "image" = "video";
 let openToken = 0;
 let opening = false;
 
@@ -303,6 +318,7 @@ function setTitle(text: string | null) {
 function renderSidebar() {
   const scroll = sidebarEl.querySelector(".media-scroll")?.scrollTop ?? 0;
   sidebarEl.replaceChildren(
+    modeSwitch(),
     h(
       "nav",
       { class: "nav" },
@@ -347,17 +363,88 @@ function renderSidebar() {
 }
 const showSettings = () => openSettingsAt();
 
+// ---- the two apps: the video editor and the image editor
+
+function modeSwitch() {
+  const tab = (mode: "video" | "image", label: string, ic: IconNode) =>
+    h(
+      "button",
+      {
+        class: appMode === mode ? "active" : "",
+        "data-tip": label === "Video" ? "Video editor" : "Image editor",
+        "data-key": mode === "video" ? "Ctrl 1" : "Ctrl 2",
+        onclick: () => setMode(mode),
+      },
+      icon(ic, 16),
+      h("span", {}, label)
+    );
+  return h(
+    "div",
+    { class: "mode-switch" },
+    tab("video", "Video", Film),
+    tab("image", "Images", ImageIcon)
+  );
+}
+
+function setMode(mode: "video" | "image") {
+  if (mode === appMode) return;
+  appMode = mode;
+  document.body.dataset.mode = mode;
+  if (mode === "image") {
+    session?.video.pause();
+    enterImages();
+  } else {
+    leaveImages();
+    renderSidebar();
+  }
+}
+
+/** Put library images on a video, each on its own image track at the playhead. */
+async function sendImagesToVideo(
+  paths: string[],
+  video: string,
+  seconds: number
+) {
+  setMode("video");
+  if (session?.path !== video) await openFile(video);
+  if (session?.path !== video) return;
+  for (const p of paths) await addImage(undefined, p, seconds);
+  toast(
+    paths.length === 1
+      ? "Image added to the video"
+      : `${paths.length} images added to the video`,
+    { body: basename(video) }
+  );
+}
+
+document.addEventListener("keydown", e => {
+  if (modalOpen() || menuOpen()) return;
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    !e.shiftKey &&
+    !e.altKey &&
+    (e.key === "1" || e.key === "2")
+  ) {
+    e.preventDefault();
+    setMode(e.key === "1" ? "video" : "image");
+  }
+});
+
 function openSettingsAt(
   section?: Parameters<typeof openSettings>[0]["section"]
 ) {
   openSettings({
     section,
-    shortcuts: () =>
-      actions.map(a => ({
+    shortcuts: () => [
+      ...actions.map(a => ({
         group: a.group,
         label: a.label,
         keys: a.keys.map(keyLabel),
       })),
+      { group: "General", label: "Video editor", keys: ["Ctrl 1"] },
+      { group: "General", label: "Image editor", keys: ["Ctrl 2"] },
+      ...imageShortcuts(),
+    ],
     onChange: () => {
       renderSidebar();
       if (!session) renderHome();
@@ -727,7 +814,7 @@ function frameSize(s: Session): [number, number] {
 }
 
 /** Lay an image over the video from t (the playhead by default) for up to 5 seconds. */
-async function addImage(at?: number, file?: string) {
+async function addImage(at?: number, file?: string, seconds = 5) {
   const s = session;
   if (!s) return;
   const picked =
@@ -750,7 +837,7 @@ async function addImage(at?: number, file?: string) {
           picked,
           stem(picked),
           Math.round(start * 1000) / 1000,
-          Math.max(0.1, Math.min(5, dur - start)),
+          Math.max(0.1, Math.min(seconds, dur - start)),
           size.w / size.h,
           fw / fh
         ),
@@ -2796,7 +2883,7 @@ const keyLabel = (combo: string) =>
     .join(" ");
 
 document.addEventListener("keydown", e => {
-  if (modalOpen() || menuOpen()) return;
+  if (appMode !== "video" || modalOpen() || menuOpen()) return;
   const t = e.target as HTMLElement;
   if (
     (t instanceof HTMLInputElement && t.type !== "range") ||
@@ -2916,12 +3003,19 @@ function setupChrome() {
     const p = e.payload;
     if (p.type === "enter" || p.type === "over") {
       document.body.classList.add("dragging");
-      dropText.textContent = session
-        ? "Drop a video to open it, or an image or audio file to add it"
-        : "Drop a video to open it";
+      dropText.textContent =
+        appMode === "image"
+          ? "Drop pictures to add them"
+          : session
+            ? "Drop a video to open it, or an image or audio file to add it"
+            : "Drop a video to open it";
     } else if (p.type === "leave") document.body.classList.remove("dragging");
     else if (p.type === "drop") {
       document.body.classList.remove("dragging");
+      if (appMode === "image") {
+        imageDrop(p.paths);
+        return;
+      }
       // while editing, images and audio files get added to the clip at the playhead
       if (session) {
         const images = p.paths.filter(x => IMAGE_EXTS.includes(ext(x)));
@@ -2960,6 +3054,8 @@ async function boot() {
     api.appInfo().catch(() => null),
   ]);
   if (app) store.app = app;
+  debug.menuTriangle =
+    store.app.channel === "dev" && store.settings.debug.menuTriangle;
   theme = await loadTheme(store.settings.theme, store.settings.m3);
   setupChrome();
   setBeforeInstall(flushAll);
@@ -2968,6 +3064,34 @@ async function boot() {
   renderHome();
   requestAnimationFrame(loop);
   startMediaWatch(renderSidebar);
+  document.body.dataset.mode = "video";
+  initImages({
+    modeSwitch,
+    showSettings,
+    showShortcuts,
+    browseVideo: async () => {
+      const f = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Video", extensions: VIDEO_EXTS }],
+      });
+      return typeof f === "string" ? f : null;
+    },
+    videos: () => {
+      const seen = new Set<string>();
+      const out: { path: string; name: string; current: boolean }[] = [];
+      const add = (path: string, current = false) => {
+        if (seen.has(path)) return;
+        seen.add(path);
+        out.push({ path, name: basename(path), current });
+      };
+      if (session) add(session.path, true);
+      for (const r of store.recents) add(r.path);
+      for (const f of poolVideos()) add(f.path);
+      return out;
+    },
+    send: sendImagesToVideo,
+  });
 
   api.tools().then(t => {
     tools = t;

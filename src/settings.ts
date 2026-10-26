@@ -4,6 +4,8 @@ import {
   FolderOpen,
   HardDrive,
   History,
+  Bug,
+  Image as ImageIcon,
   Keyboard,
   Palette,
   RefreshCw,
@@ -13,9 +15,12 @@ import {
 } from "lucide";
 
 import { api, REPO, type AppInfo, type Paths } from "./api";
+import { SIZES } from "./images/doc";
+import { libraryDir } from "./images/library";
 import { hueName, type Theme, type ThemeName } from "./themes";
 import type { M3Prefs } from "./themes/m3";
 import {
+  debug,
   basename,
   dirname,
   fmtSize,
@@ -25,6 +30,7 @@ import {
   kbd,
   modal,
   row,
+  segmented,
   stem,
   toast,
   toggle,
@@ -37,6 +43,26 @@ export type ExportPrefs = {
   targetMb: number | null;
   gpu: boolean;
 };
+
+export type ImagePrefs = {
+  /** name of a canvas size preset, see SIZES in images/templates.ts */
+  size: string;
+  /** background for new images: a color, or null for transparent */
+  bg: string | null;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  /** snap to the canvas edges and middle while dragging */
+  snap: boolean;
+  /** how long each image shows when it is sent to a video */
+  seconds: number;
+  format: "png" | "jpeg" | "webp";
+  quality: number;
+  sort: "new" | "name" | "size";
+};
+
+/** Dev builds only: draw the invisible parts of the UI. */
+export type DebugPrefs = { menuTriangle: boolean };
 
 export type Settings = {
   /** null = next to the original file */
@@ -62,6 +88,8 @@ export type Settings = {
     /** squeeze removed parts of the timeline down to thin markers */
     collapseRemoved: boolean;
   };
+  images: ImagePrefs;
+  debug: DebugPrefs;
   /** folders whose videos always show up in the media pool */
   mediaFolders: string[];
   /** applies after a restart, only the active theme is loaded */
@@ -102,6 +130,19 @@ const DEFAULTS: Settings = {
     collapsed: [],
     collapseRemoved: true,
   },
+  images: {
+    size: "video",
+    bg: null,
+    fill: "#7aa7ff",
+    stroke: "#ffffff",
+    strokeWidth: 0,
+    snap: true,
+    seconds: 5,
+    format: "png",
+    quality: 90,
+    sort: "new",
+  },
+  debug: { menuTriangle: false },
   mediaFolders: [],
   theme: "shears",
   m3: { hue: 220, intensity: 60, brightness: 50 },
@@ -126,6 +167,8 @@ export async function loadState() {
       export: { ...DEFAULTS.export, ...saved.export },
       ui: { ...DEFAULTS.ui, ...saved.ui },
       m3: { ...DEFAULTS.m3, ...saved.m3 },
+      images: { ...DEFAULTS.images, ...saved.images },
+      debug: { ...DEFAULTS.debug, ...saved.debug },
       updates: { ...DEFAULTS.updates, ...saved.updates },
     };
     store.recents = Array.isArray(s.recents) ? (s.recents as Recent[]) : [];
@@ -200,17 +243,21 @@ type SectionId =
   | "appearance"
   | "saving"
   | "history"
+  | "images"
   | "storage"
   | "updates"
-  | "shortcuts";
+  | "shortcuts"
+  | "debug";
 
 const SECTIONS: { id: SectionId; label: string; icon: IconNode }[] = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "saving", label: "Saving", icon: Save },
   { id: "history", label: "History", icon: History },
+  { id: "images", label: "Image editor", icon: ImageIcon },
   { id: "storage", label: "Storage", icon: HardDrive },
   { id: "updates", label: "Updates", icon: RefreshCw },
   { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
+  { id: "debug", label: "Debug", icon: Bug },
 ];
 
 const SHORTCUT_GROUPS = ["Playback", "Editing", "Timeline", "General"];
@@ -268,6 +315,185 @@ export function openSettings(hooks: SettingsHooks) {
     ),
     pane
   );
+
+  const sections = SECTIONS.filter(
+    sec => sec.id !== "debug" || store.app.channel === "dev"
+  );
+
+  const imagesView = () => {
+    const p = s.images;
+    const set = () => (saveSettings(), onChange());
+    const color = (value: string, apply: (v: string) => void) =>
+      h("input", {
+        class: "color-input",
+        type: "color",
+        value,
+        oninput: (e: Event) => {
+          apply((e.target as HTMLInputElement).value);
+          set();
+        },
+      });
+    return [
+      h(
+        "div",
+        { class: "form" },
+        row(
+          "New image size",
+          segmented(
+            Object.entries(SIZES).map(([value, v]) => ({
+              label: v.label,
+              value,
+            })),
+            p.size,
+            v => ((p.size = v), set(), render())
+          ),
+          `${SIZES[p.size]?.w ?? 1920} × ${SIZES[p.size]?.h ?? 1080} px`
+        ),
+        row(
+          "Background",
+          h(
+            "div",
+            { class: "inline" },
+            segmented(
+              [
+                { label: "Transparent", value: false },
+                { label: "Color", value: true },
+              ],
+              p.bg !== null,
+              v => ((p.bg = v ? "#ffffff" : null), set(), render())
+            ),
+            p.bg !== null ? color(p.bg, v => (p.bg = v)) : null
+          )
+        ),
+        row(
+          "Shapes",
+          h(
+            "div",
+            { class: "inline" },
+            h("span", { class: "dim small" }, "Fill"),
+            color(p.fill, v => (p.fill = v)),
+            h("span", { class: "dim small" }, "Outline"),
+            color(p.stroke, v => (p.stroke = v)),
+            h("input", {
+              class: "input input-sm",
+              type: "number",
+              min: "0",
+              max: "100",
+              value: String(p.strokeWidth),
+              onchange: (e: Event) => {
+                p.strokeWidth = Math.max(
+                  0,
+                  Math.min(100, +(e.target as HTMLInputElement).value || 0)
+                );
+                set();
+              },
+            }),
+            h("span", { class: "dim small" }, "px wide")
+          ),
+          "What new shapes start out as. Lines and the pen always use the outline color."
+        ),
+        row(
+          "Snapping",
+          h(
+            "div",
+            { class: "inline" },
+            toggle(p.snap, on => ((p.snap = on), set(), render())),
+            h(
+              "span",
+              { class: "dim small" },
+              "Snap to the canvas edges and middle while dragging"
+            )
+          )
+        ),
+        row(
+          "On the video",
+          h(
+            "div",
+            { class: "inline" },
+            h("input", {
+              class: "input input-sm",
+              type: "number",
+              min: "0.5",
+              max: "600",
+              step: "0.5",
+              value: String(p.seconds),
+              onchange: (e: Event) => {
+                p.seconds = Math.max(
+                  0.5,
+                  Math.min(600, +(e.target as HTMLInputElement).value || 5)
+                );
+                set();
+              },
+            }),
+            h(
+              "span",
+              { class: "dim small" },
+              "seconds each image shows when sent to a video"
+            )
+          )
+        ),
+        row(
+          "Export as",
+          segmented(
+            [
+              { label: "PNG", value: "png" as const },
+              { label: "JPEG", value: "jpeg" as const },
+              { label: "WebP", value: "webp" as const },
+            ],
+            p.format,
+            v => ((p.format = v), set(), render())
+          ),
+          "The type the export window starts on. You can pick another each time."
+        ),
+        row(
+          "Library",
+          h(
+            "div",
+            { class: "inline" },
+            h(
+              "span",
+              { class: "dim small path-text", title: libraryDir() },
+              libraryDir() || "…"
+            ),
+            h(
+              "button",
+              {
+                class: "btn btn-ghost btn-sm",
+                onclick: () => api.openFolder(libraryDir()),
+              },
+              icon(FolderOpen, 14),
+              "Open"
+            )
+          ),
+          "Saved images live here, with the layers you can edit again."
+        )
+      ),
+    ];
+  };
+
+  const debugView = () => [
+    h(
+      "div",
+      { class: "form" },
+      row(
+        "Menu triangle",
+        h(
+          "div",
+          { class: "inline" },
+          toggle(s.debug.menuTriangle, on => {
+            s.debug.menuTriangle = on;
+            debug.menuTriangle = on;
+            changed();
+          }),
+          h(
+            "span",
+            { class: "dim small" },
+            "Draw the invisible area that keeps a submenu open while you move toward it"
+          )
+        )
+      )
+    ),
+  ];
 
   const shortcuts = () => {
     const all = hooks.shortcuts();
@@ -669,11 +895,13 @@ export function openSettings(hooks: SettingsHooks) {
         ),
       ],
       updates: updates(),
+      images: imagesView(),
       shortcuts: shortcuts(),
+      debug: debugView(),
     };
 
     navList.replaceChildren(
-      ...SECTIONS.map(sec =>
+      ...sections.map(sec =>
         h(
           "button",
           {
@@ -707,7 +935,7 @@ export function openSettings(hooks: SettingsHooks) {
 
     // searching: show every section, keeping only the rows that contain all the words
     const found: Node[] = [];
-    for (const sec of SECTIONS) {
+    for (const sec of sections) {
       const part = h("div", {}, ...built[sec.id]);
       for (const r of part.querySelectorAll<HTMLElement>(
         ".form-row, .sc-row"

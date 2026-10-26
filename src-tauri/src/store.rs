@@ -152,6 +152,95 @@ pub fn forget_edits(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ---- image library: png + editable doc per image, and one index.json for names and categories
+
+fn images_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?.join("images");
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    Ok(dir)
+}
+
+/// Ids end up in file names, so keep them to plain characters.
+fn clean_id(id: &str) -> Result<&str, String> {
+    if !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        Ok(id)
+    } else {
+        Err("bad image id".into())
+    }
+}
+
+#[tauri::command]
+pub fn images_load(app: AppHandle) -> Result<Value, String> {
+    let dir = images_dir(&app)?;
+    let index = read_json(&dir.join("index.json")).unwrap_or_else(|| json!({}));
+    Ok(json!({ "dir": dir.to_string_lossy(), "index": index }))
+}
+
+#[tauri::command]
+pub fn images_save_index(app: AppHandle, index: Value) -> Result<(), String> {
+    write_json(&images_dir(&app)?.join("index.json"), &index)
+}
+
+/// Writes the png bytes sent as the raw request body; the id comes in the x-id header.
+#[tauri::command]
+pub fn image_write(app: AppHandle, request: tauri::ipc::Request) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    let id = request.headers().get("x-id").and_then(|v| v.to_str().ok()).ok_or("missing id")?;
+    let file = images_dir(&app)?.join(format!("{}.png", clean_id(id)?));
+    std::fs::write(&file, data).map_err(err)?;
+    Ok(file.to_string_lossy().into())
+}
+
+#[tauri::command]
+pub fn image_doc_read(app: AppHandle, id: String) -> Result<Option<Value>, String> {
+    Ok(read_json(&images_dir(&app)?.join(format!("{}.json", clean_id(&id)?))))
+}
+
+#[tauri::command]
+pub fn image_doc_write(app: AppHandle, id: String, doc: Value) -> Result<(), String> {
+    write_json(&images_dir(&app)?.join(format!("{}.json", clean_id(&id)?)), &doc)
+}
+
+#[tauri::command]
+pub fn image_delete(app: AppHandle, id: String) -> Result<(), String> {
+    let dir = images_dir(&app)?;
+    let id = clean_id(&id)?;
+    let _ = std::fs::remove_file(dir.join(format!("{id}.png")));
+    let _ = std::fs::remove_file(dir.join(format!("{id}.json")));
+    Ok(())
+}
+
+/// Writes the raw request body to the path in the x-path header (percent-encoded).
+#[tauri::command]
+pub fn file_write(request: tauri::ipc::Request) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    let raw = request.headers().get("x-path").and_then(|v| v.to_str().ok()).ok_or("missing path")?;
+    let mut bytes = Vec::new();
+    let b = raw.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).map_err(err)?;
+            bytes.push(u8::from_str_radix(hex, 16).map_err(err)?);
+            i += 3;
+        } else {
+            bytes.push(b[i]);
+            i += 1;
+        }
+    }
+    let path = String::from_utf8(bytes).map_err(err)?;
+    std::fs::write(path, data).map_err(err)
+}
+
+#[tauri::command]
+pub fn copy_file(from: String, to: String) -> Result<(), String> {
+    std::fs::copy(from, to).map(|_| ()).map_err(err)
+}
+
 fn prune_oldest(dir: &Path, keep: usize) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     let mut files: Vec<(std::time::SystemTime, PathBuf)> =

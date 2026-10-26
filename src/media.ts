@@ -67,6 +67,11 @@ export async function refreshMedia() {
   if (dirty) changed();
 }
 
+/** Every video in the watched folders. */
+export function poolVideos() {
+  return [...listings.values()].flatMap(l => (Array.isArray(l) ? l : []));
+}
+
 export function startMediaWatch(onChange: () => void) {
   changed = onChange;
   refreshMedia();
