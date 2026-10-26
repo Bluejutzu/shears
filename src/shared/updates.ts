@@ -110,9 +110,7 @@ function notes(text: string) {
     const bullet = /^[-*]\s+(.*)/.exec(line);
     if (bullet) {
       list ??= el.appendChild(h("ul"));
-      // indented bullets are a PR's own commits, shown under it
-      const sub = /^\s{2,}[-*]/.test(raw);
-      list.append(h("li", { class: sub ? "sub" : "" }, ...inline(bullet[1])));
+      list.append(h("li", {}, ...inline(bullet[1])));
       continue;
     }
     list = null;

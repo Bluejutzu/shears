@@ -3294,12 +3294,6 @@ kbd {
   padding-left: 18px;
 }
 
-.update-notes li.sub {
-  margin-left: 16px;
-  color: var(--text-2);
-  font-size: 13px;
-}
-
 .update-notes a {
   color: var(--blue, #4c8dff);
   text-decoration: none;

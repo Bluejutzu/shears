@@ -43,8 +43,6 @@ jobs:
         id: notes
         if: steps.version.outputs.skip != 'true'
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bun scripts/release-notes.ts "${{ steps.version.outputs.tag }}" > notes.md
           cat notes.md

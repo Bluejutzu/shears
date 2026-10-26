@@ -1,5 +1,5 @@
 // Release notes for a version: every change on main since the previous release, linked to
-// its pull request or commit. A merged PR is one line with its own commits listed under it.
+// its pull request or commit. A merged PR is one line, whatever it had inside.
 //   bun scripts/release-notes.ts v1.2.3
 // Notes run up to the v1.2.3 tag when it exists (filling in an old release), otherwise HEAD.
 import { $ } from "bun";
@@ -34,23 +34,16 @@ for (const t of tags.filter(t => t !== tag))
     break;
   }
 
-type Commit = { sha: string; parents: string[]; subject: string; body: string };
-
-async function commits(range: string, extra: string[] = []) {
+async function commits(range: string) {
   const raw =
-    await $`git log ${extra} --format=%H%x1f%P%x1f%s%x1f%b%x1e ${range}`.text();
+    await $`git log --first-parent --format=%H%x1f%s%x1f%b%x1e ${range}`.text();
   return raw
     .split("\x1e")
     .map(r => r.replace(/^\n/, ""))
     .filter(Boolean)
     .map(r => {
-      const [sha, parents, subject, body] = r.split("\x1f");
-      return {
-        sha,
-        parents: parents.split(" ").filter(Boolean),
-        subject,
-        body: body ?? "",
-      } as Commit;
+      const [sha, subject, body] = r.split("\x1f");
+      return { sha, subject, body: body ?? "" };
     });
 }
 
@@ -70,62 +63,19 @@ const commitLink = (sha: string) =>
   `[${sha.slice(0, 7)}](${url}/commit/${sha})`;
 const prLink = (n: string) => `[#${n}](${url}/pull/${n})`;
 
-/** A PR's own commits, from GitHub (they aren't in main's history after a squash). */
-async function prCommits(n: string) {
-  const res = await $`gh api ${`repos/${repo}/pulls/${n}/commits`} --paginate`
-    .nothrow()
-    .quiet();
-  if (res.exitCode !== 0) return null;
-  const list = JSON.parse(res.stdout.toString()) as {
-    sha: string;
-    commit: { message: string };
-  }[];
-  return list.map(c => ({
-    sha: c.sha,
-    subject: c.commit.message.split("\n")[0],
-  }));
-}
-
 const lines: string[] = [];
-for (const c of await commits(prev ? `${prev}..${end}` : end, [
-  "--first-parent",
-])) {
+// only main's own line of history: a merged PR counts once, not once per commit inside it
+for (const c of await commits(prev ? `${prev}..${end}` : end)) {
   // "Merge pull request #1 ..." (title in the body) or "Title (#1)"
   const merged = /^Merge pull request #(\d+)/.exec(c.subject);
   const pr = merged?.[1] ?? /\(#(\d+)\)$/.exec(c.subject)?.[1];
-  if (!pr) {
-    if (!skip(c.subject))
-      lines.push(`- ${tidy(c.subject)} (${commitLink(c.sha)})`);
-    continue;
-  }
-  const title = merged
-    ? (c.body.split("\n").find(l => l.trim()) ?? `Pull request #${pr}`)
-    : c.subject;
-  lines.push(`- ${tidy(title)} (${prLink(pr)})`);
-  // --first-parent hides a merge's other parent from %P, so ask for them directly
-  const parents = (await $`git rev-parse ${`${c.sha}^@`}`.text())
-    .split("\n")
-    .filter(Boolean);
-  const subs =
-    parents.length > 1
-      ? (await commits(`${parents[0]}..${parents[1]}`, ["--no-merges"])).map(
-          s => ({
-            subject: s.subject,
-            link: commitLink(s.sha),
-          })
-        )
-      : ((await prCommits(pr))?.map(s => ({
-          subject: s.subject,
-          link: `[${s.sha.slice(0, 7)}](${url}/pull/${pr}/commits/${s.sha})`,
-        })) ??
-        // no GitHub access: use the commit list GitHub writes into a squash message
-        c.body
-          .split("\n")
-          .filter(l => /^\s*[-*]\s/.test(l))
-          .map(l => ({ subject: l, link: "" })));
-  for (const s of subs)
-    if (!skip(s.subject))
-      lines.push(`  - ${tidy(s.subject)}${s.link ? ` (${s.link})` : ""}`);
+  if (pr) {
+    const title = merged
+      ? (c.body.split("\n").find(l => l.trim()) ?? `Pull request #${pr}`)
+      : c.subject;
+    lines.push(`- ${tidy(title)} (${prLink(pr)})`);
+  } else if (!skip(c.subject))
+    lines.push(`- ${tidy(c.subject)} (${commitLink(c.sha)})`);
 }
 
 console.log(`## What's new
