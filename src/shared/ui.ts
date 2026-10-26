@@ -1,4 +1,11 @@
-import { Check, ChevronRight, X, createElement, type IconNode } from "lucide";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  X,
+  createElement,
+  type IconNode,
+} from "lucide";
 
 type Child = Node | string | null | undefined | false;
 type Attrs = Record<string, unknown>;
@@ -98,6 +105,43 @@ export function segmented<T>(
       )
     )
   );
+}
+
+/**
+ * A dropdown that sizes to what it holds. Opens the shared menu, so it looks like
+ * every other menu instead of the system's list.
+ */
+export function select<T extends string>(
+  options: { label: string; value: T }[],
+  value: T,
+  pick: (v: T) => void
+) {
+  const label = h("span", { class: "select-label" });
+  const btn = h(
+    "button",
+    { class: "select", type: "button", "aria-haspopup": "menu" },
+    label,
+    icon(ChevronDown, 14, 2)
+  );
+  const show = () =>
+    (label.textContent = options.find(o => o.value === value)?.label ?? "");
+  show();
+  btn.addEventListener("click", () =>
+    menu(
+      btn,
+      options.map(o => ({
+        label: o.label,
+        checked: o.value === value,
+        run: () => {
+          value = o.value;
+          show();
+          pick(o.value);
+        },
+      })),
+      { minWidth: btn.offsetWidth, className: "select-menu" }
+    )
+  );
+  return btn;
 }
 
 export function toggle(on: boolean, flip: (on: boolean) => void) {
@@ -320,7 +364,12 @@ export const debug = { menuTriangle: false };
 export function menu(
   anchor: HTMLElement | { x: number; y: number },
   items: MenuItem[],
-  opts: { align?: "start" | "end"; above?: boolean } = {}
+  opts: {
+    align?: "start" | "end";
+    above?: boolean;
+    minWidth?: number;
+    className?: string;
+  } = {}
 ) {
   // clicking the button of an open menu closes it instead of opening it again
   if (anchor instanceof HTMLElement && anchor === openAnchor) {
@@ -506,6 +555,8 @@ export function menu(
   }
 
   const root = build(items, 1);
+  if (opts.className) root.classList.add(opts.className);
+  if (opts.minWidth) root.style.minWidth = `${opts.minWidth}px`;
   const top: Panel = {
     el: root,
     depth: 1,
@@ -637,7 +688,10 @@ export function menu(
   };
 }
 
-export const menuOpen = () => openMenu != null;
+/** Other floating panels (the colour picker) register here so Escape closes them before a dialog. */
+export const popups = new Set<unknown>();
+
+export const menuOpen = () => openMenu != null || popups.size > 0;
 
 // ---- modal dialogs
 

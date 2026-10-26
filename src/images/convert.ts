@@ -10,6 +10,7 @@ import {
 } from "lucide";
 
 import { api, fileUrl } from "../shared/api";
+import { colourInput } from "../shared/colour-picker";
 import { saveSettings, store } from "../shared/settings";
 import {
   basename,
@@ -287,13 +288,7 @@ function draw() {
           ? option(
               "Background",
               "Shown wherever a picture is see-through.",
-              h("input", {
-                class: "color-input",
-                type: "color",
-                value: flatten,
-                oninput: (e: Event) =>
-                  (flatten = (e.target as HTMLInputElement).value),
-              })
+              colourInput({ value: flatten, onInput: v => (flatten = v) })
             )
           : null,
         option(

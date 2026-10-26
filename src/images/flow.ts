@@ -2,7 +2,7 @@ import { Check, Film, FolderOpen, Images, Plus, Send, X } from "lucide";
 
 import { fileUrl } from "../shared/api";
 import { saveSettings, store } from "../shared/settings";
-import { h, icon, modal, segmented, toggle } from "../shared/ui";
+import { h, icon, modal, segmented, select, toggle } from "../shared/ui";
 import { searchBox } from "./bits";
 import {
   filtered,
@@ -309,31 +309,17 @@ export function renderFlow(root: HTMLElement, host: FlowHost) {
           "label",
           { class: "fl-field" },
           h("span", {}, "Starts"),
-          h(
-            "select",
-            {
-              class: "input",
-              onchange: (e: Event) => {
-                const m = (e.target as HTMLSelectElement).value;
-                place.start = m === "time" ? 0 : (m as "playhead" | "start");
-                all();
-              },
-            },
-            h(
-              "option",
-              { value: "playhead", selected: startMode === "playhead" },
-              "At the playhead"
-            ),
-            h(
-              "option",
-              { value: "start", selected: startMode === "start" },
-              "At the beginning"
-            ),
-            h(
-              "option",
-              { value: "time", selected: startMode === "time" },
-              "At a set time"
-            )
+          select(
+            [
+              { value: "playhead", label: "At the playhead" },
+              { value: "start", label: "At the beginning" },
+              { value: "time", label: "At a set time" },
+            ],
+            startMode,
+            m => {
+              place.start = m === "time" ? 0 : (m as "playhead" | "start");
+              all();
+            }
           )
         ),
         typeof place.start === "number"

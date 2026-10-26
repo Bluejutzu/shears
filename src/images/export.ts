@@ -1,6 +1,7 @@
 import { save } from "@tauri-apps/plugin-dialog";
 
 import { api, fileUrl } from "../shared/api";
+import { colourInput } from "../shared/colour-picker";
 import { openMetadata } from "../shared/metadata";
 import { store, saveSettings } from "../shared/settings";
 import {
@@ -167,13 +168,7 @@ export function exportDialog(editor: ImageEditor, name: string) {
         ? [
             row(
               "Background",
-              h("input", {
-                class: "color-input",
-                type: "color",
-                value: flatten,
-                oninput: (e: Event) =>
-                  (flatten = (e.target as HTMLInputElement).value),
-              }),
+              colourInput({ value: flatten, onInput: v => (flatten = v) }),
               "Shown wherever the picture is see-through."
             ),
           ]

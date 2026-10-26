@@ -17,6 +17,7 @@ import {
 import { SIZES } from "../images/doc";
 import { libraryDir } from "../images/library";
 import { api, REPO, type AppInfo, type Paths } from "./api";
+import { colourInput } from "./colour-picker";
 import { hueName, type Theme, type ThemeName } from "./themes";
 import type { M3Prefs } from "./themes/m3";
 import {
@@ -31,6 +32,7 @@ import {
   modal,
   row,
   segmented,
+  select,
   stem,
   toast,
   toggle,
@@ -338,12 +340,10 @@ export function openSettings(hooks: SettingsHooks) {
     const p = s.images;
     const set = () => (saveSettings(), onChange());
     const color = (value: string, apply: (v: string) => void) =>
-      h("input", {
-        class: "color-input",
-        type: "color",
+      colourInput({
         value,
-        oninput: (e: Event) => {
-          apply((e.target as HTMLInputElement).value);
+        onInput: v => {
+          apply(v);
           set();
         },
       });
@@ -353,22 +353,13 @@ export function openSettings(hooks: SettingsHooks) {
         { class: "form" },
         row(
           "New image size",
-          h(
-            "select",
-            {
-              class: "input settings-select",
-              onchange: (e: Event) => {
-                p.size = (e.target as HTMLSelectElement).value;
-                set();
-              },
-            },
-            ...Object.entries(SIZES).map(([value, v]) =>
-              h(
-                "option",
-                { value, selected: value === p.size },
-                `${v.label} · ${v.w} × ${v.h}`
-              )
-            )
+          select(
+            Object.entries(SIZES).map(([value, v]) => ({
+              value,
+              label: `${v.label} · ${v.w} × ${v.h}`,
+            })),
+            p.size,
+            v => ((p.size = v), set())
           ),
           "The canvas a blank new image starts with"
         ),

@@ -875,6 +875,27 @@ kbd {
   box-shadow: 0 0 0 2px var(--md-primary);
 }
 
+/* search boxes are the field themselves: the ring goes on the box, not the input inside it */
+:root .search-box,
+:root .settings-search {
+  border: 0;
+  border-radius: var(--md-shape-m);
+  background: var(--md-container-highest);
+}
+
+:root .search-box:focus-within,
+:root .settings-search:focus-within {
+  box-shadow: 0 0 0 2px var(--md-primary);
+}
+
+:root .search-box .input,
+:root .settings-search .input,
+:root .search-box .input:focus,
+:root .settings-search .input:focus {
+  background: none;
+  box-shadow: none;
+}
+
 /* ---------- menus, tooltips, toasts and dialogs ---------- */
 
 .menu {

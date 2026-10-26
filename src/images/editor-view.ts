@@ -31,9 +31,10 @@ import {
   type IconNode,
 } from "lucide";
 
+import { colourInput } from "../shared/colour-picker";
 import { openMetadata } from "../shared/metadata";
 import { store } from "../shared/settings";
-import { h, icon, segmented, stem, toggle } from "../shared/ui";
+import { h, icon, segmented, select, stem, toggle } from "../shared/ui";
 import { tipBtn } from "./bits";
 import { swatchStyle } from "./create";
 import { fileToDataUrl, FONTS, type Layer } from "./doc";
@@ -421,13 +422,11 @@ function layerProps(ed: ImageEditor) {
       "div",
       { class: "inline" },
       toggle(value !== null, on => (apply(on ? fallback : null), ed.commit())),
-      h("input", {
-        class: "color-input",
-        type: "color",
+      colourInput({
         value: value ?? fallback,
         disabled: value === null,
-        oninput: (e: Event) => apply((e.target as HTMLInputElement).value),
-        onchange: () => ed.commit(),
+        onInput: apply,
+        onCommit: () => ed.commit(),
       })
     );
 
@@ -497,18 +496,11 @@ function layerProps(ed: ImageEditor) {
         }),
         field(
           "Font",
-          (() => {
-            const s = h("select", {
-              class: "input input-sm",
-              onchange: (e: Event) => (
-                ed.set(ids, { font: (e.target as HTMLSelectElement).value }),
-                ed.commit()
-              ),
-            });
-            for (const f of FONTS)
-              s.append(h("option", { value: f, selected: f === one.font }, f));
-            return s;
-          })()
+          select(
+            FONTS.map(f => ({ value: f, label: f })),
+            one.font,
+            v => (ed.set(ids, { font: v }), ed.commit())
+          )
         ),
         field(
           "Size",
@@ -692,14 +684,10 @@ function pictureProps(ed: ImageEditor) {
             onclick: () => (ed.setDoc({ bg: b.bg }), ed.commit()),
           })
         ),
-        h("input", {
-          class: "color-input",
-          type: "color",
-          title: "Pick a color",
+        colourInput({
           value: typeof d.bg === "string" ? d.bg : "#ffffff",
-          oninput: (e: Event) =>
-            ed.setDoc({ bg: (e.target as HTMLInputElement).value }),
-          onchange: () => ed.commit(),
+          onInput: v => ed.setDoc({ bg: v }),
+          onCommit: () => ed.commit(),
         })
       )
     ),

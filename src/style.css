@@ -1846,6 +1846,256 @@ kbd {
   font-size: 12px;
 }
 
+/* ---------- dropdown ---------- */
+
+.select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 140px;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.select:hover {
+  border-color: var(--border-strong);
+}
+
+.select:focus-visible,
+.select.open {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.select .icon {
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.12s;
+}
+
+.select.open .icon {
+  transform: rotate(180deg);
+}
+
+.select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu.select-menu {
+  max-height: min(340px, calc(100vh - 16px));
+  overflow-y: auto;
+}
+
+.menu.select-menu .menu-item {
+  height: 32px;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+/* ---------- color picker ---------- */
+
+.cp-pop {
+  position: fixed;
+  z-index: 50;
+  width: 272px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  animation: pop 0.12s ease-out;
+}
+
+.cp {
+  display: grid;
+  gap: 12px;
+  user-select: none;
+}
+
+.cp-square {
+  position: relative;
+  height: 160px;
+  border-radius: 10px;
+  cursor: crosshair;
+  touch-action: none;
+  outline-offset: 2px;
+}
+
+.cp-thumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.cp-square:active .cp-thumb,
+.cp-hue:active .cp-thumb {
+  transform: translate(-50%, -50%) scale(1.25);
+}
+
+.cp-hue .cp-thumb {
+  top: 50%;
+}
+
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-hue {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  background: linear-gradient(
+    to right,
+    #f00,
+    #ff0 17%,
+    #0f0 33%,
+    #0ff 50%,
+    #00f 67%,
+    #f0f 83%,
+    #f00
+  );
+}
+
+.cp-btn,
+.cp-compare {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.cp-btn {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+}
+
+.cp-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.cp-compare {
+  display: flex;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.3);
+}
+
+.cp-compare > span {
+  flex: 1;
+}
+
+.cp-mode {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.cp-mode:hover {
+  color: var(--text);
+}
+
+.cp-fields {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cp-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font:
+    500 12px ui-monospace,
+    "Cascadia Mono",
+    Consolas,
+    monospace;
+  text-transform: uppercase;
+  outline: none;
+  user-select: text;
+}
+
+.cp-input:focus {
+  border-color: var(--blue);
+}
+
+.cp-input.bad {
+  border-color: var(--danger);
+}
+
+.cp-unit {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.cp-title {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.cp-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.cp-swatch {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.3);
+  transition: transform 0.1s;
+}
+
+.cp-swatch:hover {
+  transform: scale(1.12);
+}
+
 .tooltip {
   position: fixed;
   z-index: 100;
@@ -3345,10 +3595,4 @@ kbd {
 
 .update-notes-head:first-child {
   margin-top: 0;
-}
-
-.settings-select {
-  min-width: 220px;
-  padding-right: 10px;
-  cursor: pointer;
 }

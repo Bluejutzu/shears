@@ -2,8 +2,18 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Copy, Upload } from "lucide";
 
 import { api } from "../shared/api";
+import { colourInput } from "../shared/colour-picker";
 import { store } from "../shared/settings";
-import { basename, h, icon, modal, row, stem, toast } from "../shared/ui";
+import {
+  basename,
+  h,
+  icon,
+  modal,
+  row,
+  select,
+  stem,
+  toast,
+} from "../shared/ui";
 import {
   blobToDataUrl,
   fileToDataUrl,
@@ -292,24 +302,18 @@ export function newDialog() {
               h(
                 "div",
                 {},
-                h(
-                  "select",
-                  {
-                    class: "input settings-select",
-                    onchange: (e: Event) => {
-                      size = (e.target as HTMLSelectElement).value;
-                      w = SIZES[size].w;
-                      hgt = SIZES[size].h;
-                      render();
-                    },
-                  },
-                  ...Object.entries(SIZES).map(([value, v]) =>
-                    h(
-                      "option",
-                      { value, selected: value === size },
-                      `${v.label} · ${v.w} × ${v.h}`
-                    )
-                  )
+                select(
+                  Object.entries(SIZES).map(([value, v]) => ({
+                    value,
+                    label: `${v.label} · ${v.w} × ${v.h}`,
+                  })),
+                  size,
+                  v => {
+                    size = v;
+                    w = SIZES[size].w;
+                    hgt = SIZES[size].h;
+                    render();
+                  }
                 ),
                 h(
                   "div",
@@ -343,16 +347,10 @@ export function newDialog() {
                 "div",
                 { class: "swatches" },
                 ...BACKGROUNDS.map(swatch),
-                h("input", {
-                  class: "color-input",
-                  type: "color",
-                  title: "Pick a color",
+                colourInput({
                   value: typeof bg.bg === "string" ? bg.bg : "#ffffff",
-                  oninput: (e: Event) =>
-                    (bg = {
-                      label: "Custom",
-                      bg: (e.target as HTMLInputElement).value,
-                    }),
+                  onInput: v => (bg = { label: "Custom", bg: v }),
+                  onCommit: render,
                 })
               )
             ),
