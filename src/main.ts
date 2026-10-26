@@ -115,10 +115,8 @@ import {
   h,
   icon,
   initTooltips,
-  kbd,
   menu,
   menuOpen,
-  modal,
   modalOpen,
   progressBar,
   stem,
@@ -347,8 +345,19 @@ function renderSidebar() {
   const scroller = sidebarEl.querySelector(".media-scroll");
   if (scroller) scroller.scrollTop = scroll;
 }
-function showSettings() {
+const showSettings = () => openSettingsAt();
+
+function openSettingsAt(
+  section?: Parameters<typeof openSettings>[0]["section"]
+) {
   openSettings({
+    section,
+    shortcuts: () =>
+      actions.map(a => ({
+        group: a.group,
+        label: a.label,
+        keys: a.keys.map(keyLabel),
+      })),
     onChange: () => {
       renderSidebar();
       if (!session) renderHome();
@@ -2802,42 +2811,7 @@ document.addEventListener("keydown", e => {
 });
 
 function showShortcuts() {
-  const groups = ["Playback", "Editing", "Timeline", "General"];
-  const body = h(
-    "div",
-    { class: "shortcuts" },
-    h(
-      "div",
-      { class: "sc-grid" },
-      ...groups.map(g =>
-        h(
-          "div",
-          { class: "sc-group" },
-          h("div", { class: "sc-title" }, g),
-          ...actions
-            .filter(a => a.group === g)
-            .map(a =>
-              h(
-                "div",
-                { class: "sc-row" },
-                h("span", {}, a.label),
-                h(
-                  "span",
-                  { class: "sc-keys" },
-                  ...a.keys.map(k => kbd(keyLabel(k)))
-                )
-              )
-            )
-        )
-      )
-    ),
-    h(
-      "div",
-      { class: "sc-foot" },
-      "Timeline: click to seek, drag a cut line to move it, Ctrl + scroll to zoom, Shift + scroll to pan. Drag the line in an audio track to change its volume, drag added tracks and images sideways to move them, and drag an image's edge to change how long it shows. Hold Shift to skip snapping. Right-click anything for more."
-    )
-  );
-  modal("Keyboard shortcuts", body, { wide: true });
+  openSettingsAt("shortcuts");
 }
 
 // ---- render loop: skip removed parts during playback and keep the UI in sync
